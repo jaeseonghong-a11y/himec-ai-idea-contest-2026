@@ -1,32 +1,34 @@
 # HIMEC AI Idea Contest 2026
 
-제1회 HIMEC AI 활용 아이디어 공모전 출품을 위한 비공개 팀 협업 저장소입니다. 공식 마감일은 2026년 9월 30일이며, 정확한 마감 시각은 공고에 명시되지 않았습니다.
+제1회 HIMEC AI 활용 아이디어 공모전 출품을 위한 공개 팀 협업 저장소입니다. 공식 마감일은 2026년 9월 30일이며, 정확한 마감 시각은 공고에 명시되지 않았습니다.
 
-## 새 팀원 시작 순서
+## 가장 먼저 읽을 파일
 
-1. `AGENTS.md` — 모든 사람과 AI가 따를 공통 규칙
-2. `CURRENT_STATE.md` — 지금 상태와 바로 할 다음 작업
-3. `docs/PROJECT_BRIEF.md` — 아이디어·사용자·성공 기준
-4. `sources/SOURCE_INDEX.md` — 공식 원본과 검증 상태
-5. `docs/TEAM_WORKFLOW.md` — 브랜치·PR·병합 절차
-6. `docs/AI_ONBOARDING.md` — 각자 AI에 전달할 시작 프롬프트
+1. `START_HERE.md` — 역할과 전체 순환 구조
+2. `BRANCH_ASSIGNMENTS.md` — 현재 라운드에서 사용할 정확한 브랜치
+3. `prompts/` — 편집 없이 붙여넣는 AI 요청문
+4. `AGENTS.md` — 모든 사람과 AI가 따를 공통 규칙
+5. `CURRENT_STATE.md` — 지금 상태와 바로 할 다음 작업
 
 ## 현재 핵심 상태
 
 - 공식 공고와 제출 양식 원본 확보
 - 평가 기준과 제출 체크리스트 정리
 - 아이디어·지원 분야·기술 스택은 팀 합의 필요
-- 팀원 GitHub 사용자명은 확인되는 순서대로 초대 예정
+- 팀원 계정: `archuni`, `ehgudwns18`, `kijun-0108` 협업 권한 확인
 
 ## 작업 흐름
 
 ```text
-main 최신화 → 작업별 브랜치 → 작은 변경과 검증 → push → PR → 팀원 검토 → squash merge
+팀장 AI: 최신 main에서 팀원별 라운드 브랜치 생성
+팀원 AI: 지정 브랜치 최신화 → 작업 → commit → push → PR 생성 후 정지
+팀장 AI: PR 순차 검토 → 충돌·통합 검증 → main에 squash merge
+팀장 AI: 최신 main에서 다음 라운드 브랜치 생성 → 반복
 ```
 
-`main`에 직접 push하거나 force push하지 않습니다. 작성된 참가신청서, 개인정보 동의서, 서명, 연락처, 신분증·계좌정보는 Git에 올리지 않습니다.
+`main` 통합은 `jaeseonghong-a11y`와 그 사용자가 실행시킨 AI만 담당합니다. 팀원은 할당된 `work/<사용자명>/rNN` 브랜치에만 push하고 PR을 직접 병합하지 않습니다. 작성된 참가신청서, 개인정보 동의서, 서명, 연락처, 신분증·계좌정보는 Git에 올리지 않습니다.
 
-현재 저장소는 비공개이며 GitHub Free 계정 제한으로 서버 측 branch protection을 켤 수 없습니다. 저장소를 공개하거나 계정을 업그레이드하기 전까지 팀 규칙과 PR 검토로 동일한 절차를 지킵니다.
+저장소는 공개이며 `main`에 활성 Ruleset이 적용되어 있습니다. 팀원은 `main`을 갱신·삭제·강제 push할 수 없고, PR을 열어 팀장 통합을 기다립니다. Ruleset은 `main`에만 적용되므로 팀원별 작업 브랜치에는 push할 수 있습니다. [현재 Ruleset](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/rules/24130976)
 
 ## 공식 자료
 

@@ -5,12 +5,14 @@
 ## 시작할 때 읽을 순서
 
 1. `AGENTS.md`
-2. `CURRENT_STATE.md`
-3. `docs/PROJECT_BRIEF.md`
-4. `sources/SOURCE_INDEX.md`
-5. 필요한 경우 `docs/DECISION_LOG.md`, `docs/TEAM_WORKFLOW.md`, `docs/SUBMISSION_CHECKLIST.md`
-6. `git status --short`, `git diff`, `git log --oneline -5`
-7. 현재 작업에 필요한 실제 자료와 코드
+2. `START_HERE.md`
+3. `BRANCH_ASSIGNMENTS.md`
+4. `CURRENT_STATE.md`
+5. `docs/PROJECT_BRIEF.md`
+6. `sources/SOURCE_INDEX.md`
+7. 필요한 경우 `docs/DECISION_LOG.md`, `docs/TEAM_WORKFLOW.md`, `docs/SUBMISSION_CHECKLIST.md`
+8. `git status --short`, `git diff`, `git log --oneline -5`
+9. 현재 작업에 필요한 실제 자료와 코드
 
 문서와 결과물이 다르면 실제 파일을 확인하고 문서를 갱신한다. 다른 팀원이나 AI가 만든 미커밋 변경은 삭제·reset·stash하지 않는다.
 
@@ -40,14 +42,17 @@
 
 ## GitHub 팀 규칙
 
-- `main`은 최종 기준선이다. 직접 push와 force push를 하지 않는다.
-- 브랜치는 `feat/<topic>`, `fix/<topic>`, `docs/<topic>`, `research/<topic>` 형식을 사용한다.
-- 모든 변경은 Pull Request(PR)로 제출하며 최소 1명의 팀원 검토와 가능한 검증을 거쳐 squash merge한다.
+- 저장소 소유자이자 유일한 통합 담당자는 `jaeseonghong-a11y`다.
+- `main`은 최종 기준선이다. 팀원과 팀원 AI는 `main`을 수정·commit·push·merge·rebase·reset하지 않는다.
+- 팀원과 팀원 AI는 브랜치를 임의로 생성하지 않는다. `BRANCH_ASSIGNMENTS.md`에 지정된 `work/<github-user>/rNN` 브랜치만 사용한다.
+- 팀원은 작업 브랜치에만 commit·push하고 `main` 대상 Pull Request(PR)를 연 뒤 멈춘다. PR을 직접 병합하거나 닫거나 브랜치를 삭제하지 않는다.
+- `main` 병합, 충돌 해결, 병합 순서 결정, 다음 라운드 브랜치 생성은 `jaeseonghong-a11y` 또는 그 사용자가 명시적으로 실행시킨 AI만 수행한다.
+- 통합 담당 AI는 PR별 최신 SHA·diff·검증·충돌을 확인하고 안전한 PR만 순차적으로 squash merge한다. 제품 판단이 필요한 충돌은 사용자에게 묻는다.
 - 본인이 담당한 파일만 stage한다. 다른 팀원의 변경을 `git add -A`로 섞지 않는다.
 - 공통 문서, 데이터 계약, 빌드 설정을 동시에 바꿀 때는 담당자 한 명을 정한다.
 - 병행 작업은 각자 clone 또는 별도 worktree에서 수행한다. 같은 작업 트리를 여러 AI가 동시에 편집하지 않는다.
-- 충돌은 양쪽 의도를 확인해 통합한다. 보호 규칙 우회, 강제 push, 공유 `main` 재작성은 금지한다.
-- 병합은 사용자가 특정 PR의 병합을 요청했거나 팀이 명시적으로 정한 권한 범위에서만 수행한다.
+- 충돌은 양쪽 의도를 확인해 통합한다. 관리자 권한을 이용한 직접 push, 강제 push, 공유 `main` 재작성은 금지한다.
+- 공개 저장소의 `main`에는 활성 Ruleset `Protect main - owner merges`가 적용된다. 관리자 역할만 우회할 수 있고 팀원 Write 역할은 `main` 갱신·삭제·강제 push가 차단된다. 저장소 소유자도 모든 통합을 PR과 squash merge로 기록한다.
 
 ## 작업 종료
 

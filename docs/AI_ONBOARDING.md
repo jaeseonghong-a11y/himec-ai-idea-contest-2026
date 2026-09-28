@@ -1,27 +1,12 @@
-# AI 작업 시작 프롬프트
+# AI 작업 요청 위치
 
-팀원이 사용하는 AI 도구에 아래 프롬프트를 전달한다.
+편집 없이 그대로 붙여넣는 요청문은 `prompts/`에 있다.
 
-```text
-이 저장소는 제1회 HIMEC AI 활용 아이디어 공모전 출품 프로젝트다.
-먼저 AGENTS.md, CURRENT_STATE.md, docs/PROJECT_BRIEF.md,
-sources/SOURCE_INDEX.md와 현재 git status/diff/log를 읽어.
+- 팀원 최초 시작: `prompts/TEAM_FIRST_START.md`
+- 팀원 다음 라운드: `prompts/TEAM_NEXT_ROUND.md`
+- 팀장 라운드 시작: `prompts/OWNER_OPEN_ROUND.md`
+- 팀장 PR 병합과 다음 라운드 생성: `prompts/OWNER_MERGE_AND_NEXT_ROUND.md`
 
-공식 사실은 SRC-001~004에 근거하고, 팀 분석·가정과 구분해.
-확인되지 않은 하이멕 내부 업무·데이터·성과 수치는 만들지 마.
-작성된 참가서류, 연락처, 생년월일, 서명 등 개인정보는 Git에 올리지 마.
+팀원에게 Git 명령을 따로 설명하지 않는다. 팀원은 GitHub 초대 수락과 로그인만 직접 하고, 나머지는 자신의 AI가 저장소 문서에 따라 처리하게 한다.
 
-이번 작업은 [작업명], 담당 경로는 [경로], 완료 기준은 [기준]이다.
-본인 브랜치에서 작은 변경으로 수행하고 실제 검증 결과와 미검증을
-CURRENT_STATE.md에 기록해. 커밋·push·PR은 AGENTS.md 규칙을 따라.
-```
-
-## 역할별 첫 브랜치 예시
-
-- `research/problem-evidence`: 문제·현장 근거와 출처
-- `feat/prototype`: 최소 사용자 경로 프로토타입
-- `docs/proposal`: 붙임 4 제안서 초안
-- `docs/presentation`: 발표/설명 자료
-- `chore/submission-qa`: 출처·권리·제출 패키지 점검
-
-실제 담당자가 정해지면 동시에 같은 파일을 고치지 않도록 이슈에 담당 경로를 적는다.
+모든 프롬프트는 현재 로그인된 GitHub 사용자명, `BRANCH_ASSIGNMENTS.md`, 열린 이슈와 PR을 AI가 직접 확인하도록 작성되어 있다. 팀원이 브랜치명이나 작업명을 직접 편집해 넣지 않는다.
