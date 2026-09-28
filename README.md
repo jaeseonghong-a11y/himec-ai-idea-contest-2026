@@ -6,7 +6,7 @@
 
 1. `START_HERE.md` — 역할과 전체 순환 구조
 2. `BRANCH_ASSIGNMENTS.md` — 현재 라운드에서 사용할 정확한 브랜치
-3. `prompts/` — 편집 없이 붙여넣는 AI 요청문
+3. `prompts/README.md` — 처음 시작, 병합 요청, 새 작업, 리뷰 수정, 막힘 상황별 AI 요청문
 4. `AGENTS.md` — 모든 사람과 AI가 따를 공통 규칙
 5. `CURRENT_STATE.md` — 지금 상태와 바로 할 다음 작업
 
@@ -23,7 +23,7 @@
 팀장 AI: 최신 main에서 팀원별 라운드 브랜치 생성
 팀원 AI: 지정 브랜치 최신화 → 작업 → commit → push → PR 생성 후 정지
 팀장 AI: PR 순차 검토 → 충돌·통합 검증 → main에 squash merge
-팀장 AI: 최신 main에서 다음 라운드 브랜치 생성 → 반복
+팀장 AI: 병합된 팀원에게 최신 main에서 새 브랜치 배정 → 반복
 ```
 
 `main` 통합은 `jaeseonghong-a11y`와 그 사용자가 실행시킨 AI만 담당합니다. 팀원은 할당된 `work/<사용자명>/rNN` 브랜치에만 push하고 PR을 직접 병합하지 않습니다. 작성된 참가신청서, 개인정보 동의서, 서명, 연락처, 신분증·계좌정보는 Git에 올리지 않습니다.

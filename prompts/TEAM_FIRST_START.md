@@ -13,7 +13,7 @@ https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026
 1. 현재 GitHub 로그인 계정을 확인해. 초대 수락·로그인·권한 승인이 필요하면 내가 직접 할 수 있게 안내하고, 비밀번호나 토큰은 요구하지 마.
 2. 저장소 접근 권한을 확인하고 적절한 작업 폴더에 clone해. 이미 clone되어 있다면 중복 clone하지 말고 기존 저장소를 찾아 상태를 확인해.
 3. AGENTS.md, START_HERE.md, BRANCH_ASSIGNMENTS.md, CURRENT_STATE.md, README.md, docs/PROJECT_BRIEF.md, sources/SOURCE_INDEX.md, docs/TEAM_WORKFLOW.md를 순서대로 읽어.
-4. 현재 로그인된 GitHub 사용자명과 BRANCH_ASSIGNMENTS.md 표를 대조해 내 할당 브랜치를 자동으로 찾어. 사용자명이나 브랜치가 없으면 임의로 만들지 말고 팀장에게 필요한 정보를 알려줘.
+4. origin을 fetch하고 최신 `origin/main`의 BRANCH_ASSIGNMENTS.md를 읽어. 현재 로그인된 GitHub 사용자명과 표를 대조해 내 할당 브랜치를 자동으로 찾아. 사용자명이나 브랜치가 없으면 임의로 만들지 말고 팀장에게 필요한 정보를 알려줘.
 5. main에서는 파일을 수정·commit·push·merge·rebase·reset하지 마. 브랜치를 직접 만들거나 이름을 바꾸지도 마.
 6. 기존 사용자 파일과 미커밋 변경을 보존해. 안전한 상태에서 origin을 fetch하고, 팀장이 만든 내 할당 원격 브랜치를 checkout한 뒤 그 브랜치만 fast-forward 방식으로 최신화해.
 7. GitHub에서 내게 배정된 열린 이슈와 BRANCH_ASSIGNMENTS.md의 담당 이슈를 확인해. 담당 이슈가 없으면 코드를 임의로 작성하지 말고 배정 요청 내용을 알려준 뒤 멈춰.
