@@ -7,7 +7,7 @@
 | SRC-001 | 제1회 HIMEC AI 활용 아이디어 공모전 공고 | 주최사 공식 | `official/SRC-001_official_notice.pdf`, [공식 뉴스룸](https://www.himec.co.kr/ko/info/newsroom/?bbsid=33&gbn=viewok&ix=508&scroll=Y) | 2026-09-29 | 원본 확보·3쪽 시각 검토 |
 | SRC-002 | 붙임 1~4 제출서류 | 주최사 공식 | `official/SRC-002_submission_forms.docx`, `.hwp` | 2026-09-29 | 원본 확보·DOCX 필드 추출 |
 | SRC-003 | 하이멕 업무·산업 맥락 | 주최사 공식 웹 | `SRC-003_HIMEC_CONTEXT.md`의 링크 | 2026-09-29 | 페이지별 확인 |
-| SRC-004 | 건축설비엔지니어링 DX 및 AI 전략 논문 안내 | 주최사 공식 웹 | [기술자료 목록](https://www.himec.co.kr/ko/info/technical/), [게시물](https://www.himec.co.kr/ko/info/technical/?gbn=viewok&gp=2&ix=427) | 2026-09-29 | 제목·게시 사실 확인, 본문 미검증 |
+| SRC-004 | 건축설비엔지니어링 DX 구축 사례 및 AI 전략 | 하이멕 저자 학술발표 논문 | `official/SRC-004_HIMEC_DX_AI_strategy.pdf`, [게시물](https://www.himec.co.kr/ko/info/technical/?gbn=viewok&gp=2&ix=427) | 2026-09-29 | 원본 확보·4쪽 전체 시각 검토 |
 
 ## 원본 무결성
 
@@ -19,6 +19,7 @@
 | `SRC-001_official_notice.pdf` | `2E150234D229237E211928F07421D8FC53437A055A15DD64E66518B74698B979` |
 | `SRC-002_submission_forms.docx` | `94A92E8462CB2B6DC99765D33B675DC1D68F581C11F1C2121024B871DC5CF6AA` |
 | `SRC-002_submission_forms.hwp` | `17E504418D4D2BF5F3876411C2492724C22E0F5DE86F28590F7877ACCF863557` |
+| `SRC-004_HIMEC_DX_AI_strategy.pdf` | `6D1B5D347D0CCFECE68919082631D81FA5D3C86D9F83D3FF3ED4906C4A754329` |
 
 ## 근거 사용 규칙
 
