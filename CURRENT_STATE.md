@@ -30,8 +30,8 @@
 
 - 문제와 해결: 비공개 Free 저장소의 보호 규칙 제한 → 사용자 지시에 따라 공개 전환, `main` 전용 Ruleset 24130976 활성화
 - 변경 파일: `AGENTS.md`, `README.md`, `START_HERE.md`, `BRANCH_ASSIGNMENTS.md`, `docs/TEAM_WORKFLOW.md`, `prompts/`
-- 실행한 검증: GitHub API로 공개 상태, 팀원 3명의 Write 권한과 관리자 1명, `main`에 적용된 다섯 규칙 확인
-- 결과: 팀원은 지정 브랜치에서 push·PR 가능, `main` 갱신·삭제·강제 push는 관리자 역할로 제한
+- 실행한 검증: GitHub API로 공개 상태, 팀원 3명의 Write 권한과 관리자 1명, `main`의 다섯 규칙 확인. PR #10 일반 병합 차단과 관리자 squash 병합 성공 확인. 팀원 브랜치 세 개의 시작 SHA 일치 확인
+- 결과: 팀원은 지정 브랜치에서 push·PR 가능, `main` 갱신·삭제·강제 push는 관리자 역할로 제한. PR #10 병합 SHA `ab01cab`; Round 01 브랜치 셋의 최초 생성 기준은 이 SHA
 - 남은 위험: 관리자 역할은 Ruleset을 우회할 수 있어 팀장 AI도 PR 절차를 따라야 함; 제품 아이디어와 데모 범위 미정
 
 ### 2026-09-29 / Codex / 보호 브랜치 확인
