@@ -34,13 +34,13 @@
 - 결과: 팀원은 지정 브랜치에서 push·PR 가능, `main` 갱신·삭제·강제 push는 관리자 역할로 제한. PR #10 병합 SHA `ab01cab`; Round 01 브랜치 셋의 최초 생성 기준은 이 SHA
 - 남은 위험: 관리자 역할은 Ruleset을 우회할 수 있어 팀장 AI도 PR 절차를 따라야 함; 제품 아이디어와 데모 범위 미정
 
-### 2026-09-29 / Codex / 보호 브랜치 확인
+### 2026-09-29 / Codex / 팀원별 병합 요청과 후속 작업 절차
 
-- 문제와 해결: 비공개 저장소 `main` 보호 규칙 적용 시 403 → 저장소를 임의로 공개하지 않고 수동 PR·1인 리뷰 규칙을 명시
-- 변경 파일: `README.md`, `docs/TEAM_WORKFLOW.md`, `CURRENT_STATE.md`
-- 실행한 명령: GitHub branch protection API 적용 및 조회
-- 결과: 당시 GitHub Pro 업그레이드 또는 public 전환 필요 응답 확인. 이후 공개 전환과 Ruleset 적용으로 해결
-- 남은 위험: 없음 — 현재 설정은 위 최신 체크포인트 참조
+- 문제와 해결: 전체 팀원 PR이 끝나야 새 라운드를 여는 지침 때문에 먼저 끝난 팀원이 대기 → 팀원별 독립 라운드로 변경
+- 변경 파일: `prompts/`, `START_HERE.md`, `docs/TEAM_WORKFLOW.md`, `docs/AI_ONBOARDING.md`, `BRANCH_ASSIGNMENTS.md`, `AGENTS.md`
+- 검증: 프롬프트 간 역할·브랜치 권한·상태 전이를 대조하고 Git diff 검증
+- 결과: 팀원은 PR 병합 요청·리뷰 수정·새 작업 요청을 복붙 프롬프트로 처리; 팀장은 병합된 팀원에게만 다음 브랜치 배정 가능
+- 남은 위험: 다음 작업 범위·담당 파일이 미정이면 팀장이 배정 결정을 해야 함
 
 ### 2026-09-29 / Codex / 하이멕 DX·AI 전략 학습
 

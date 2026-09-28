@@ -7,19 +7,20 @@
 - `main` 통합 권한: 팀장 또는 팀장이 명시적으로 실행시킨 AI만 사용
 - 팀원 AI: 지정 브랜치 작업, push, PR 생성까지만 수행
 
-## 한 라운드의 순환
+## 팀원별 작업 순환
 
-1. 팀장 AI가 모든 병합을 마친 최신 `origin/main`을 확인한다.
-2. 팀장 AI가 최신 `main`에서 `work/<사용자명>/rNN` 브랜치를 각각 새로 만든다.
-3. 팀장 AI가 `BRANCH_ASSIGNMENTS.md`에 라운드·브랜치·이슈·담당 경로를 기록한다.
-4. 팀원은 각자 AI에 `prompts/TEAM_FIRST_START.md` 또는 `prompts/TEAM_NEXT_ROUND.md`를 그대로 붙여넣는다.
-5. 팀원 AI는 자신의 GitHub 계정을 감지하고 할당된 브랜치만 checkout한다.
-6. 팀원 AI는 해당 브랜치를 `origin`에서 최신화한 뒤 작업·검증·commit·push한다.
-7. 팀원 AI는 `main` 대상 PR을 만들고 멈춘다. 병합·브랜치 삭제·다음 브랜치 생성은 하지 않는다.
-8. 팀장은 자신의 AI에 `prompts/OWNER_MERGE_AND_NEXT_ROUND.md`를 그대로 붙여넣는다.
-9. 팀장 AI는 열린 PR을 순차 검토한다. 최신 SHA, diff, 검증, 비밀값, 충돌과 의미상의 충돌을 확인한다.
-10. 안전한 PR만 squash merge하고 `main` 통합 검증을 실행한다.
-11. 모든 안전한 PR 처리가 끝나면 최신 `main`에서 다음 라운드 브랜치를 만든다.
+1. 팀장 AI가 최신 `origin/main`에서 팀원별 `work/<사용자명>/rNN` 브랜치를 만든다.
+2. 팀장 AI가 `BRANCH_ASSIGNMENTS.md`에 사용자별 활성 브랜치·이슈·담당 경로를 기록한다.
+3. 팀원은 각자 AI에 `prompts/TEAM_FIRST_START.md` 또는 `prompts/TEAM_NEXT_ROUND.md`를 그대로 붙여넣는다.
+4. 팀원 AI는 자신의 GitHub 계정을 감지하고 할당된 브랜치만 checkout한다.
+5. 팀원 AI는 해당 브랜치를 `origin`에서 최신화한 뒤 작업·검증·commit·push한다.
+6. 팀원 AI는 `main` 대상 PR을 만들고 멈춘다. 병합·브랜치 삭제·다음 브랜치 생성은 하지 않는다.
+7. 팀원은 병합을 원할 때 `prompts/TEAM_REQUEST_MERGE.md`를 AI에 붙여넣어 PR 상태와 병합 요청을 남긴다.
+8. 팀장은 `prompts/OWNER_MERGE_AND_NEXT_ROUND.md`를 AI에 붙여넣고 병합 요청이 온 PR을 순차 검토한다.
+9. 안전한 PR만 squash merge하고 `main` 통합 검증을 실행한다.
+10. 병합이 끝난 팀원은 다른 팀원의 PR이 열려 있어도 다음 작업을 받을 수 있다. 팀장 AI가 그 팀원에게만 최신 `main` 기반 새 `rNN` 브랜치와 이슈를 배정한다. 미병합 팀원은 기존 브랜치를 유지한다.
+
+각 팀원의 라운드 번호가 서로 달라도 정상이다. `rNN`은 사용자별로 증가한다. `BRANCH_ASSIGNMENTS.md`는 현재 팀원별 활성 배정을 나타내며, 과거 브랜치와 PR은 GitHub 이력으로 추적한다. 팀원 AI는 로컬 문서가 오래됐을 수 있으므로 fetch 후 `origin/main`의 배정표를 확인한다.
 
 ## pull과 push의 의미
 
@@ -27,7 +28,7 @@
 - `push`: 팀원 PC의 commit을 GitHub 작업 브랜치로 올린다.
 - `merge`: 작업 브랜치의 변경을 `main`에 통합한다. 이 프로젝트에서는 팀장 AI만 수행한다.
 
-팀원은 매 라운드마다 이전 브랜치를 억지로 최신화하지 않는다. 팀장 AI가 최신 `main`에서 새 라운드 브랜치를 만들기 때문에, 팀원 AI는 새로 지정된 브랜치를 fetch·checkout해 작업한다. 이 방식은 삭제 후 같은 이름의 브랜치를 재사용할 때 생기는 이력 분기를 피한다.
+팀원은 병합된 이전 브랜치를 억지로 최신화하지 않는다. 팀장 AI가 최신 `main`에서 새 브랜치를 만들면 팀원 AI가 fetch·checkout해 작업한다. 기존 브랜치를 삭제 후 같은 이름으로 재사용하지 않는다.
 
 ## 충돌 처리
 
