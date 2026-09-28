@@ -22,10 +22,15 @@ TestResults/
 node_modules/
 dist/
 coverage/
+tmp/
 *.log
 
 # Local source package; the extracted workflow kit is tracked.
 team-workflow-kit-*.zip
+
+# Filled application forms contain personal data and signatures. Keep them
+# outside Git and assemble the final email package in this local-only folder.
+submission-private/
 
 # Customer drawings, personal data, and confidential source material must not
 # be added here. If safe fixtures are needed, put sanitized samples under a

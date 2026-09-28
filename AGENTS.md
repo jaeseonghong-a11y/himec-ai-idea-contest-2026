@@ -7,9 +7,10 @@
 1. `AGENTS.md`
 2. `CURRENT_STATE.md`
 3. `docs/PROJECT_BRIEF.md`
-4. 필요한 경우 `docs/DECISION_LOG.md`, `docs/TEAM_WORKFLOW.md`
-5. `git status --short`, `git diff`, `git log --oneline -5`
-6. 현재 작업에 필요한 실제 자료와 코드
+4. `sources/SOURCE_INDEX.md`
+5. 필요한 경우 `docs/DECISION_LOG.md`, `docs/TEAM_WORKFLOW.md`, `docs/SUBMISSION_CHECKLIST.md`
+6. `git status --short`, `git diff`, `git log --oneline -5`
+7. 현재 작업에 필요한 실제 자료와 코드
 
 문서와 결과물이 다르면 실제 파일을 확인하고 문서를 갱신한다. 다른 팀원이나 AI가 만든 미커밋 변경은 삭제·reset·stash하지 않는다.
 
@@ -17,19 +18,23 @@
 
 - 프로젝트명: 하이멕 AI 활용 아이디어 공모전
 - 마감 목표: 2026-09-30까지 제출 가능 상태 완성
+- 목표: 제1회 HIMEC AI 활용 아이디어 공모전 출품
 - 한 줄 정의: 미정 — `docs/PROJECT_BRIEF.md`에서 팀 합의 후 확정
 - 제품 구성·기술 스택·개발 환경: 미정
 - AutoCAD 플러그인 적용 여부와 범위: 미정
-- 제출 규격과 평가 기준: 공고 원문 확인 전 미검증
+- 제출 규격과 평가 기준: `sources/SRC-001_OFFICIAL_CONTEST.md` 기준
 
 ## 작업 방식
 
 - 한 브랜치에는 한 가지 산출물 또는 검증 가능한 작은 작업만 담는다.
 - 작업 시작 전에 완료 기준과 담당 파일을 이슈 또는 팀 채널에 기록한다.
 - 자료 조사 결과는 출처 URL, 확인 날짜, 근거와 해석을 구분해 남긴다.
+- 새 근거를 추가할 때 `sources/SOURCE_INDEX.md`에 식별자, 원본 위치, 확인일, 검증 상태를 먼저 등록한다.
+- 공식 원본은 `sources/official/`에 변형 없이 보존하고, 해석은 별도 Markdown 파일에 작성한다.
 - 외부 SDK/API, 공모전 규정, 호환성은 공식 자료나 실제 실행으로 확인한다.
 - 생성형 AI 결과는 사실 검증과 팀 검토 없이 최종 근거로 사용하지 않는다.
 - 개인정보, 고객 자료, API 키, 토큰을 코드·문서·로그·커밋에 넣지 않는다.
+- 서명·생년월일·전화번호 등이 적힌 참가 서류는 절대 Git에 올리지 않고 `submission-private/` 또는 저장소 밖에서 관리한다.
 - 검증 명령은 기술 스택이 정해지는 즉시 이 파일과 CI에 추가한다. 현재 자동 검증 명령은 `미정`이다.
 - 커밋 메시지는 `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:` 중 알맞은 말머리를 사용한다.
 
