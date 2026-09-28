@@ -44,7 +44,7 @@
 - 적용 대상: `refs/heads/main`만. 팀원별 `work/<사용자명>/rNN` 브랜치에는 적용되지 않는다.
 - `Restrict updates`: 관리자 역할만 우회하여 `main`을 갱신할 수 있다. 현재 관리자 계정은 `jaeseonghong-a11y`이고 세 팀원은 Write 권한이다.
 - `Restrict deletions`, `Block force pushes`, `Require linear history`, `Require a pull request before merging` 적용. 병합 방법은 squash만 허용한다.
-- 관리자 우회 방식은 `Always allow`다. 따라서 팀장 계정에는 기술적으로 직접 push도 가능하지만 프로젝트 규칙상 PR을 거쳐 통합한다.
+- 관리자 우회 방식은 `Always allow`다. 실제 PR #10에서 일반 squash 병합은 차단되고 팀장 계정의 `--admin` 병합으로 성공했다. 팀장 AI는 검토를 끝낸 PR에만 관리자 병합 권한을 사용한다. 직접 push는 프로젝트 규칙상 금지다.
 - 팀원은 지정 브랜치에 push하고 PR을 만든 뒤 멈춘다. Ruleset 변경 권한은 관리자에게만 있다.
 
 공개 저장소이므로 코드와 이력이 누구에게나 보인다. 개인정보가 기입된 신청서, 서명, 연락처, 토큰, 고객 자료는 `submission-private/` 또는 저장소 밖에 둔다.

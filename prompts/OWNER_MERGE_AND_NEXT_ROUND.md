@@ -13,7 +13,7 @@ AGENTS.md, START_HERE.md, BRANCH_ASSIGNMENTS.md, CURRENT_STATE.md, docs/TEAM_WOR
 3. 각 PR의 작성자, base/main, head 브랜치, 최신 SHA, diff, 예상치 못한 삭제, 비밀값·개인정보, 출처, 테스트를 확인해.
 4. 더러운 작업 트리는 reset이나 stash로 없애지 말고 별도 worktree에서 검토해.
 5. 최신 main과 충돌 및 의미상의 충돌을 검사하고 통합 검증을 실행해. 충돌 해결에 제품 결정이 필요하거나 한쪽 의도를 확신할 수 없으면 해당 PR은 병합하지 말고 나에게 질문해.
-6. 검토한 SHA와 현재 PR SHA가 같은지 다시 확인한 후 안전한 PR만 squash merge해. 관리자 우회나 force push는 하지 마.
+6. 검토한 SHA와 현재 PR SHA가 같은지 다시 확인한 후 안전한 PR만 squash merge해. 이 Ruleset은 팀장 계정의 일반 병합도 막으므로 GitHub CLI에서 필요하면 `gh pr merge <번호> --squash --admin`으로 관리자 권한을 사용해. 이 권한은 검토를 끝낸 PR 병합에만 사용하고 직접 push나 force push는 하지 마.
 7. 한 PR을 병합할 때마다 main을 fast-forward로 최신화하고 통합 검증 후 다음 PR을 검토해.
 8. 병합하지 못한 PR은 이유와 필요한 수정 사항을 남기고 유지해. 팀원 브랜치를 임의로 삭제하지 마.
 9. 안전한 PR 처리가 모두 끝나고 열린 팀원 PR이 없을 때만 다음 라운드를 준비해.
