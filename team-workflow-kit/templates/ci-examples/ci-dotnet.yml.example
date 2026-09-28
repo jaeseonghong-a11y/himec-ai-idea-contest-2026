@@ -1,0 +1,29 @@
+﻿# .NET을 선택한 경우에만 조정해서 .github/workflows/ci.yml로 복사합니다.
+# 이 파일은 workflows 밖에 있고 .example 확장자이므로 자동 실행되지 않습니다.
+# AutoCAD 참조 어셈블리의 라이선스·복원 방식과 runner 호환성을 먼저 검증하세요.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          # TODO: 실제 프로젝트 SDK 버전으로 변경
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: dotnet restore
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+      - name: Test
+        run: dotnet test --no-build --configuration Release
+
+# 실제 AutoCAD host를 실행해야 하는 smoke test는 별도 Windows 환경 또는
+# 팀의 수동 검증 기록으로 관리합니다. 이 CI 성공만으로 CAD 호환성을 주장하지 않습니다.

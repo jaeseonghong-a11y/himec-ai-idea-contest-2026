@@ -1,0 +1,32 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pfx
+*.pem
+*.key
+*.snk
+
+# IDE and operating-system files
+.vs/
+.vscode/*.local.json
+*.user
+*.suo
+.DS_Store
+Thumbs.db
+
+# Build and test outputs
+bin/
+obj/
+TestResults/
+node_modules/
+dist/
+coverage/
+*.log
+
+# Local source package; the extracted workflow kit is tracked.
+team-workflow-kit-*.zip
+
+# Customer drawings, personal data, and confidential source material must not
+# be added here. If safe fixtures are needed, put sanitized samples under a
+# clearly documented test-fixtures directory.

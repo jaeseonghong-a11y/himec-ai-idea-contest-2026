@@ -1,0 +1,24 @@
+﻿# 새 프로젝트의 실제 빌드 도구에 맞게 검토한 뒤 .gitignore로 사용
+.env
+.env.*
+!.env.example
+*.pfx
+*.pem
+*.key
+*.snk
+*.user
+*.suo
+.vs/
+bin/
+obj/
+TestResults/
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+Thumbs.db
+
+# 고객 도면·개인정보가 든 파일은 별도 보호 경로에 둡니다.
+# 모든 DWG를 무조건 무시하면 합법적인 테스트 fixture까지 사라질 수 있으므로
+# 도면 확장자 전체를 이 예시에 일괄 추가하지 않았습니다.
