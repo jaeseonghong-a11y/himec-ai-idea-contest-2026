@@ -26,6 +26,8 @@ main 최신화 → 작업별 브랜치 → 작은 변경과 검증 → push → 
 
 `main`에 직접 push하거나 force push하지 않습니다. 작성된 참가신청서, 개인정보 동의서, 서명, 연락처, 신분증·계좌정보는 Git에 올리지 않습니다.
 
+현재 저장소는 비공개이며 GitHub Free 계정 제한으로 서버 측 branch protection을 켤 수 없습니다. 저장소를 공개하거나 계정을 업그레이드하기 전까지 팀 규칙과 PR 검토로 동일한 절차를 지킵니다.
+
 ## 공식 자료
 
 - [하이멕 공식 공고](https://www.himec.co.kr/ko/info/newsroom/?bbsid=33&gbn=viewok&ix=508&scroll=Y)
