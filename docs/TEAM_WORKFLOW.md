@@ -1,58 +1,53 @@
-# 팀 협업 실행 절차
+# 팀장 통합형 GitHub 작업 절차
 
-## 공통 원칙
+## 역할
 
-각 팀원은 자신의 PC에 저장소를 clone하고, 자신의 브랜치와 AI 세션을 사용한다. 공통 기억은 대화창이 아니라 `AGENTS.md`, `CURRENT_STATE.md`, 이슈, PR, Git 이력이다.
+- 팀장·저장소 소유자: `jaeseonghong-a11y`
+- 팀원: `archuni`, `ehgudwns18`, `kijun-0108`
+- `main` 통합 권한: 팀장 또는 팀장이 명시적으로 실행시킨 AI만 사용
+- 팀원 AI: 지정 브랜치 작업, push, PR 생성까지만 수행
 
-## 작업 시작
+## 한 라운드의 순환
 
-```powershell
-git switch main
-git pull --ff-only origin main
-git status --short
-git switch -c feat/<짧은-작업명>
-```
+1. 팀장 AI가 모든 병합을 마친 최신 `origin/main`을 확인한다.
+2. 팀장 AI가 최신 `main`에서 `work/<사용자명>/rNN` 브랜치를 각각 새로 만든다.
+3. 팀장 AI가 `BRANCH_ASSIGNMENTS.md`에 라운드·브랜치·이슈·담당 경로를 기록한다.
+4. 팀원은 각자 AI에 `prompts/TEAM_FIRST_START.md` 또는 `prompts/TEAM_NEXT_ROUND.md`를 그대로 붙여넣는다.
+5. 팀원 AI는 자신의 GitHub 계정을 감지하고 할당된 브랜치만 checkout한다.
+6. 팀원 AI는 해당 브랜치를 `origin`에서 최신화한 뒤 작업·검증·commit·push한다.
+7. 팀원 AI는 `main` 대상 PR을 만들고 멈춘다. 병합·브랜치 삭제·다음 브랜치 생성은 하지 않는다.
+8. 팀장은 자신의 AI에 `prompts/OWNER_MERGE_AND_NEXT_ROUND.md`를 그대로 붙여넣는다.
+9. 팀장 AI는 열린 PR을 순차 검토한다. 최신 SHA, diff, 검증, 비밀값, 충돌과 의미상의 충돌을 확인한다.
+10. 안전한 PR만 squash merge하고 `main` 통합 검증을 실행한다.
+11. 모든 안전한 PR 처리가 끝나면 최신 `main`에서 다음 라운드 브랜치를 만든다.
 
-AI 도구에는 다음을 먼저 지시한다.
+## pull과 push의 의미
 
-```text
-AGENTS.md, CURRENT_STATE.md, docs/PROJECT_BRIEF.md와 현재 git 상태를 먼저 읽어.
-다른 팀원의 변경을 보존하고, 이번 브랜치의 담당 범위와 완료 기준만 수행해.
-실제로 검증한 결과와 미검증 사항을 CURRENT_STATE.md에 기록해.
-```
+- `pull`: GitHub에 있는 브랜치의 최신 변경을 팀원 PC로 가져온다.
+- `push`: 팀원 PC의 commit을 GitHub 작업 브랜치로 올린다.
+- `merge`: 작업 브랜치의 변경을 `main`에 통합한다. 이 프로젝트에서는 팀장 AI만 수행한다.
 
-## 작업 종료와 PR
+팀원은 매 라운드마다 이전 브랜치를 억지로 최신화하지 않는다. 팀장 AI가 최신 `main`에서 새 라운드 브랜치를 만들기 때문에, 팀원 AI는 새로 지정된 브랜치를 fetch·checkout해 작업한다. 이 방식은 삭제 후 같은 이름의 브랜치를 재사용할 때 생기는 이력 분기를 피한다.
 
-```powershell
-git status --short
-git diff
-git add <본인이 변경한 경로>
-git diff --cached
-git commit -m "feat: 작업 요약"
-git push -u origin HEAD
-```
+## 충돌 처리
 
-GitHub에서 `main`을 대상으로 PR을 열고 템플릿을 채운다. push만으로는 `main`에 반영되지 않는다.
+- 팀장 AI는 PR을 한 번에 합치지 않고 하나씩 검토·병합한다.
+- 먼저 병합된 PR 때문에 다음 PR이 충돌하면 별도 worktree에서 양쪽 의도를 비교한다.
+- 자동 해결이 확실하지 않거나 제품 결정이 필요한 충돌은 병합하지 않고 팀장에게 질문한다.
+- `ours` 또는 `theirs`로 전체 파일을 근거 없이 덮지 않는다.
+- 병합 후 다음 PR을 검토하기 전에 `main` 통합 검증을 다시 실행한다.
 
-## 병합 기준
+## 현재 GitHub 보호 설정
 
-- PR 설명과 변경 범위가 일치한다.
-- 비밀값, 개인정보, 출처 불명 자료가 없다.
-- 합의한 검증이 통과했거나 미검증 사유가 명시돼 있다.
-- 최소 1명의 다른 팀원이 검토한다.
-- 최신 `main`과 충돌 및 의미상의 충돌이 없다.
-- 기본 병합 방식은 squash merge이며 병합 후 작업 브랜치를 삭제한다.
+2026-09-29 저장소를 공개로 전환하고 `main` 대상 Ruleset [`Protect main - owner merges`](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/rules/24130976)을 활성화했다. GitHub API에서 적용 규칙 5개와 권한을 확인했다.
 
-## 현재 GitHub 제한
+- 적용 대상: `refs/heads/main`만. 팀원별 `work/<사용자명>/rNN` 브랜치에는 적용되지 않는다.
+- `Restrict updates`: 관리자 역할만 우회하여 `main`을 갱신할 수 있다. 현재 관리자 계정은 `jaeseonghong-a11y`이고 세 팀원은 Write 권한이다.
+- `Restrict deletions`, `Block force pushes`, `Require linear history`, `Require a pull request before merging` 적용. 병합 방법은 squash만 허용한다.
+- 관리자 우회 방식은 `Always allow`다. 따라서 팀장 계정에는 기술적으로 직접 push도 가능하지만 프로젝트 규칙상 PR을 거쳐 통합한다.
+- 팀원은 지정 브랜치에 push하고 PR을 만든 뒤 멈춘다. Ruleset 변경 권한은 관리자에게만 있다.
 
-2026-09-29 확인 결과, 개인 GitHub Free 계정의 비공개 저장소에서는 `main` branch protection 적용이 거부되었다. 저장소 공개 또는 GitHub Pro 전환 전까지 다음을 수동으로 지킨다.
-
-- 누구도 `main`에 직접 push하지 않는다.
-- 모든 변경은 PR을 만들고 최소 1명의 다른 팀원이 승인한다.
-- 병합 직전 PR의 최신 커밋과 검토한 커밋이 같은지 확인한다.
-- force push와 `main` 삭제를 하지 않는다.
-
-공개 전환은 제안 내용과 Git 이력의 공개를 뜻하므로 팀 대표 승인 없이 실행하지 않는다.
+공개 저장소이므로 코드와 이력이 누구에게나 보인다. 개인정보가 기입된 신청서, 서명, 연락처, 토큰, 고객 자료는 `submission-private/` 또는 저장소 밖에 둔다.
 
 ## 마감일 운영
 
