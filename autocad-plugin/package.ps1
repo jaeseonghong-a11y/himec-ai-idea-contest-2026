@@ -1,6 +1,6 @@
 param(
     [string]$Dotnet = "dotnet",
-    [string]$Version = "0.1.0"
+    [Parameter(Mandatory = $true)][string]$Version
 )
 
 $ErrorActionPreference = "Stop"

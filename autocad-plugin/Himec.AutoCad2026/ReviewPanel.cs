@@ -1,4 +1,6 @@
 using System.Windows.Forms;
+using System.Drawing;
+using NAudio.Wave;
 using Himec.ChangeCore;
 using AcadApp = Autodesk.AutoCAD.ApplicationServices.Application;
 
@@ -7,43 +9,106 @@ namespace Himec.AutoCad2026;
 internal sealed class ReviewPanel : UserControl
 {
     private readonly AudioRecorder _recorder = new();
-    private readonly TextBox _transcript = new() { Multiline = true, ScrollBars = ScrollBars.Vertical, Width = 360, Height = 120 };
-    private readonly Label _summary = new() { AutoSize = false, Width = 360, Height = 60, Text = "변경 지시 없음" };
-    private readonly Label _target = new() { AutoSize = false, Width = 360, Height = 52, Text = "대상 미지정 — 도면에서 직접 선택하세요." };
+    private readonly TextBox _transcript = new() { Multiline = true, ScrollBars = ScrollBars.Vertical, Width = 360, Height = 92 };
+    private readonly Label _summary = new() { AutoSize = false, Width = 360, Height = 54, Text = "변경 지시 없음" };
+    private readonly Label _target = new() { AutoSize = false, Width = 360, Height = 48, Text = "대상 미지정 — 도면에서 직접 선택하세요." };
     private readonly Label _status = new() { AutoSize = false, Width = 360, Height = 55, Text = "녹음은 로컬에 저장됩니다. 외부 전송은 전사 버튼을 눌렀을 때만 합니다." };
+    private readonly Label _keyState = new() { AutoSize = false, Width = 360, Height = 22 };
+    private readonly Label _recordingInfo = new() { AutoSize = false, Width = 360, Height = 22, Text = "선택된 녹음 없음" };
+    private readonly ToolTip _tooltips = new();
     private readonly Button _record = new() { Text = "● 녹음 시작", Width = 170 };
     private readonly Button _stop = new() { Text = "■ 녹음 중지", Width = 170, Enabled = false };
+    private readonly Button _chooseAudio = new() { Text = "이미 녹음한 WAV 선택", Width = 340 };
+    private readonly Button _setApiKey = new() { Text = "전사 API 키 입력 (이번 실행에만 사용)", Width = 340 };
     private readonly Button _transcribe = new() { Text = "녹음 전사(API 호출)", Width = 340 };
     private readonly Button _analyze = new() { Text = "전사문에서 이동 지시 찾기", Width = 340 };
     private readonly Button _suggest = new() { Text = "'왼쪽 세 번째' 후보 찾기", Width = 340 };
     private readonly Button _pick = new() { Text = "도면에서 대상 직접 선택", Width = 340 };
     private readonly Button _approve = new() { Text = "지시 승인", Width = 340 };
     private readonly Button _execute = new() { Text = "승인된 변경 실행", Width = 340 };
+    private string? _sessionApiKey;
+    private string? _selectedAudioPath;
+    private readonly Panel _statusPanel = new() { Dock = DockStyle.Fill, BackColor = PaletteTheme.Status };
 
     public ReviewPanel()
     {
         Dock = DockStyle.Fill;
-        var layout = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
-        layout.Controls.Add(new Label { Text = "HIMEC 설계 변경 v0 — 합성 도면 시험용", Width = 360, Height = 28 });
-        var row = new FlowLayoutPanel { Width = 370, Height = 39, WrapContents = false };
+        BackColor = PaletteTheme.Canvas;
+        ForeColor = PaletteTheme.Text;
+        Font = new Font("Segoe UI", 9F);
+
+        var shell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = Padding.Empty, Padding = Padding.Empty };
+        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 66));
+        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
+        shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        var header = new Panel { Dock = DockStyle.Fill, BackColor = PaletteTheme.Header, Padding = new Padding(13, 8, 8, 4) };
+        header.Controls.Add(new Label
+        {
+            Dock = DockStyle.Bottom, Height = 20, ForeColor = PaletteTheme.Muted,
+            Text = "녹음 → 변경 해석 → 대상 확인 → 승인 실행", Font = new Font("Segoe UI", 8.5F)
+        });
+        header.Controls.Add(new Label
+        {
+            Dock = DockStyle.Top, Height = 28, ForeColor = PaletteTheme.Text,
+            Text = "HIMEC  |  설계 변경", Font = new Font("Segoe UI", 12F, FontStyle.Bold)
+        });
+        _status.Dock = DockStyle.Fill;
+        _status.ForeColor = PaletteTheme.Text;
+        _status.Padding = new Padding(12, 10, 12, 8);
+        _status.Font = new Font("Segoe UI", 9F);
+        _statusPanel.Controls.Add(_status);
+
+        var layout = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false,
+            AutoScroll = true, Padding = new Padding(10, 12, 10, 12), BackColor = PaletteTheme.Canvas
+        };
+        var row = new FlowLayoutPanel { Width = 340, Height = 39, WrapContents = false, BackColor = PaletteTheme.Surface, Margin = Padding.Empty };
         row.Controls.Add(_record);
         row.Controls.Add(_stop);
-        layout.Controls.Add(row);
-        layout.Controls.Add(_transcribe);
-        layout.Controls.Add(new Label { Text = "회의 전사문 (수동 입력도 가능)", Width = 360, Height = 25 });
-        layout.Controls.Add(_transcript);
-        layout.Controls.Add(_analyze);
-        layout.Controls.Add(_summary);
-        layout.Controls.Add(_suggest);
-        layout.Controls.Add(_pick);
-        layout.Controls.Add(_target);
-        layout.Controls.Add(_approve);
-        layout.Controls.Add(_execute);
-        layout.Controls.Add(_status);
-        Controls.Add(layout);
+        var cardInput = CreateCard("01  회의 입력", "녹음은 로컬 저장 · 전사는 별도 동의 후 전송", row, _chooseAudio, _recordingInfo,
+            _keyState, _setApiKey, _transcribe,
+            new Label { Text = "전사문  |  직접 수정·입력 가능", Height = 21 }, _transcript);
+        var cardParse = CreateCard("02  변경 지시 확인", "이동량을 읽고, 불명확한 대상은 보류합니다.", _analyze, _summary);
+        var cardTarget = CreateCard("03  도면 대상 지정", "후보는 참고용 · 최종 대상은 직접 클릭", _suggest, _pick, _target);
+        var cardApply = CreateCard("04  검토 후 반영", "승인 전에는 도면을 수정하지 않습니다.", _approve, _execute);
+        var cards = new[] { cardInput, cardParse, cardTarget, cardApply };
+        foreach (var card in cards) layout.Controls.Add(card);
+        layout.SizeChanged += (_, _) =>
+        {
+            var cardWidth = Math.Max(320, layout.ClientSize.Width - layout.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth - 3);
+            foreach (var card in cards)
+            {
+                card.Width = cardWidth;
+                var innerWidth = cardWidth - card.Padding.Horizontal;
+                foreach (Control child in card.Controls)
+                    child.Width = innerWidth;
+                _record.Width = (innerWidth - 8) / 2;
+                _stop.Width = (innerWidth - 8) / 2;
+            }
+        };
+        shell.Controls.Add(header, 0, 0);
+        shell.Controls.Add(_statusPanel, 0, 1);
+        shell.Controls.Add(layout, 0, 2);
+        Controls.Add(shell);
+
+        foreach (var button in new[] { _record, _stop, _chooseAudio, _setApiKey, _transcribe, _analyze, _suggest, _pick, _approve, _execute })
+            PaletteTheme.Button(button, primary: button == _analyze || button == _pick, caution: button == _execute);
+        foreach (var label in new[] { _keyState, _recordingInfo, _summary, _target }) PaletteTheme.Label(label);
+        _summary.ForeColor = PaletteTheme.Text;
+        _target.ForeColor = PaletteTheme.Text;
+        _transcript.BackColor = PaletteTheme.Input;
+        _transcript.ForeColor = PaletteTheme.Text;
+        _transcript.BorderStyle = BorderStyle.FixedSingle;
+        _transcript.Font = new Font("Segoe UI", 10F);
+        _transcript.Margin = new Padding(0, 4, 0, 4);
+        UpdateKeyState();
 
         _record.Click += (_, _) => StartRecording();
         _stop.Click += async (_, _) => await StopRecordingAsync();
+        _chooseAudio.Click += (_, _) => ChooseAudio();
+        _setApiKey.Click += (_, _) => PromptForApiKey();
         _transcribe.Click += async (_, _) => await TranscribeAsync();
         _analyze.Click += (_, _) => Analyze();
         _suggest.Click += (_, _) => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_SUGGEST ", true, false, false);
@@ -55,8 +120,45 @@ internal sealed class ReviewPanel : UserControl
     public void SetStatus(string text)
     {
         if (IsDisposed) return;
-        if (InvokeRequired) BeginInvoke(() => _status.Text = text);
-        else _status.Text = text;
+        if (InvokeRequired) BeginInvoke(() => SetStatus(text));
+        else
+        {
+            _status.Text = text;
+            _statusPanel.BackColor = text.Contains("실패") || text.Contains("불가")
+                ? PaletteTheme.Error
+                : text.Contains("취소") || text.Contains("미설정")
+                    ? PaletteTheme.Warning
+                    : text.Contains("완료") || text.Contains("저장") || text.Contains("설정됐")
+                        ? PaletteTheme.Success
+                        : PaletteTheme.Status;
+        }
+    }
+
+    private static FlowLayoutPanel CreateCard(string title, string subtitle, params Control[] children)
+    {
+        var card = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.TopDown, WrapContents = false,
+            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Width = 360, Padding = new Padding(12, 9, 12, 11), Margin = new Padding(0, 0, 0, 10),
+            BackColor = PaletteTheme.Surface
+        };
+        card.Controls.Add(new Label
+        {
+            Text = title, Height = 22, Width = 336, ForeColor = PaletteTheme.Accent,
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold), Margin = new Padding(0, 0, 0, 2)
+        });
+        card.Controls.Add(new Label
+        {
+            Text = subtitle, Height = 24, Width = 336, ForeColor = PaletteTheme.Muted,
+            Font = new Font("Segoe UI", 8.5F), Margin = new Padding(0, 0, 0, 5)
+        });
+        foreach (var child in children)
+        {
+            if (child is Label label && label.ForeColor == SystemColors.ControlText) PaletteTheme.Label(label);
+            card.Controls.Add(child);
+        }
+        return card;
     }
 
     public void SetTarget(string text)
@@ -71,6 +173,8 @@ internal sealed class ReviewPanel : UserControl
         try
         {
             _recorder.Start();
+            _selectedAudioPath = null;
+            _recordingInfo.Text = "녹음 중… 중지 후 파일을 확인하세요.";
             _record.Enabled = false;
             _stop.Enabled = true;
             SetStatus("녹음 중. 로컬 파일에만 저장하며 약 5분/10MB가 상한입니다.");
@@ -83,7 +187,8 @@ internal sealed class ReviewPanel : UserControl
         try
         {
             var path = await _recorder.StopAsync();
-            SetStatus("녹음 저장: " + path);
+            SetSelectedAudio(path);
+            SetStatus("녹음 저장 완료. 전사하려면 API 키와 외부 전송 동의가 필요합니다.");
         }
         catch (System.Exception ex) { SetStatus("녹음 중지 실패: " + ex.Message); }
         finally { _record.Enabled = true; _stop.Enabled = false; }
@@ -91,19 +196,109 @@ internal sealed class ReviewPanel : UserControl
 
     private async Task TranscribeAsync()
     {
-        var path = _recorder.LastFilePath;
-        if (path is null) { SetStatus("먼저 녹음하세요. 전사문 직접 입력도 가능합니다."); return; }
-        if (MessageBox.Show("합성 녹음 파일을 OpenAI 전사 API로 전송합니다. 동의하나요? 실제 회의/고객 정보는 보내지 마세요.",
+        var path = _selectedAudioPath;
+        if (path is null) { SetStatus("먼저 녹음하거나 기존 WAV를 선택하세요. 전사문 직접 입력도 가능합니다."); return; }
+        if (string.IsNullOrWhiteSpace(_sessionApiKey) && !OpenAiTranscriber.HasEnvironmentKey && !PromptForApiKey())
+        {
+            SetStatus("전사 취소: API 키가 없습니다. 전사문을 직접 입력할 수 있습니다.");
+            return;
+        }
+        if (MessageBox.Show($"{Path.GetFileName(path)} 파일을 OpenAI 전사 API로 전송합니다. 동의하나요? 허가받지 않은 회의/고객 정보는 보내지 마세요.",
                 "외부 전송 확인", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
         _transcribe.Enabled = false;
         try
         {
             SetStatus("전사 중…");
-            _transcript.Text = await OpenAiTranscriber.TranscribeAsync(path);
+            _transcript.Text = await OpenAiTranscriber.TranscribeAsync(path, _sessionApiKey);
             SetStatus("전사 완료. 원문을 확인하고 이동 지시 찾기를 누르세요.");
         }
-        catch (System.Exception ex) { SetStatus("전사 실패: " + ex.Message); }
+        catch (System.Exception ex)
+        {
+            SetStatus("전사 실패: " + ex.Message);
+            MessageBox.Show(ex.Message, "전사 실패 — 녹음 파일은 로컬에 남아 있습니다", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
         finally { _transcribe.Enabled = true; }
+    }
+
+    private void ChooseAudio()
+    {
+        using var picker = new OpenFileDialog
+        {
+            Title = "전사할 WAV 파일 선택",
+            InitialDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Himec", "Recordings"),
+            Filter = "WAV 오디오 (*.wav)|*.wav",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (picker.ShowDialog() != DialogResult.OK) return;
+        try
+        {
+            SetSelectedAudio(picker.FileName);
+            SetStatus("녹음 파일이 선택됐습니다. API 키 설정 후 전사 버튼을 누르세요.");
+        }
+        catch (System.Exception ex)
+        {
+            SetStatus("녹음 파일 선택 실패: " + ex.Message);
+            MessageBox.Show(ex.Message, "녹음 파일을 사용할 수 없습니다", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void SetSelectedAudio(string path)
+    {
+        var size = new FileInfo(path).Length;
+        if (size < 44 || size > 10_000_000)
+            throw new InvalidOperationException("WAV 파일은 10MB 이하이고 비어 있지 않아야 합니다.");
+        using var reader = new WaveFileReader(path);
+        if (reader.TotalTime.TotalSeconds <= 0)
+            throw new InvalidOperationException("WAV 파일 길이가 0초입니다.");
+        _selectedAudioPath = path;
+        _recordingInfo.Text = $"선택 녹음: {reader.TotalTime.TotalSeconds:0.0}초 · {size / 1024.0:0}KB";
+        _tooltips.SetToolTip(_recordingInfo, path);
+    }
+
+    private bool PromptForApiKey()
+    {
+        using var dialog = new Form
+        {
+            Text = "OpenAI 전사 API 키",
+            Width = 470,
+            Height = 185,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            StartPosition = FormStartPosition.CenterScreen,
+            MaximizeBox = false,
+            MinimizeBox = false
+        };
+        var explanation = new Label
+        {
+            Left = 16, Top = 12, Width = 420, Height = 45,
+            Text = "키는 이번 AutoCAD 실행 중 메모리에서만 사용하며 파일이나 Git에 저장하지 않습니다. 화면 공유 중에는 입력하지 마세요."
+        };
+        var input = new TextBox { Left = 16, Top = 61, Width = 420, UseSystemPasswordChar = true };
+        var okay = new Button { Text = "사용", Left = 250, Top = 98, Width = 88, DialogResult = DialogResult.OK };
+        var cancel = new Button { Text = "취소", Left = 348, Top = 98, Width = 88, DialogResult = DialogResult.Cancel };
+        dialog.Controls.AddRange([explanation, input, okay, cancel]);
+        dialog.AcceptButton = okay;
+        dialog.CancelButton = cancel;
+        if (dialog.ShowDialog() != DialogResult.OK) return false;
+        if (string.IsNullOrWhiteSpace(input.Text))
+        {
+            SetStatus("빈 API 키는 사용할 수 없습니다.");
+            return false;
+        }
+        _sessionApiKey = input.Text.Trim();
+        input.Clear();
+        UpdateKeyState();
+        SetStatus("전사 API 키가 이번 실행에만 설정됐습니다. 녹음 전사 버튼으로 전송을 확인하세요.");
+        return true;
+    }
+
+    private void UpdateKeyState()
+    {
+        _keyState.Text = !string.IsNullOrWhiteSpace(_sessionApiKey)
+            ? "전사 키: 이번 실행에만 입력됨"
+            : OpenAiTranscriber.HasEnvironmentKey
+                ? "전사 키: 로컬 환경변수에서 사용 가능"
+                : "전사 키: 미설정 — 녹음은 가능, API 전사는 불가";
     }
 
     private void Analyze()
@@ -158,7 +353,12 @@ internal sealed class ReviewPanel : UserControl
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) _recorder.Dispose();
+        if (disposing)
+        {
+            _recorder.Dispose();
+            _tooltips.Dispose();
+            _sessionApiKey = null;
+        }
         base.Dispose(disposing);
     }
 }

@@ -15,4 +15,22 @@ foreach (var test in cases)
 }
 if (InstructionParser.TryParseMove("여기 기둥 좀 옮겨", out _, out _))
     throw new Exception("Ambiguous amount was accepted");
-Console.WriteLine($"{cases.Length + 1} parser checks passed");
+if (ColumnTargeting.IsColumnLabel("three_columns_mm", "0"))
+    throw new Exception("Whole-drawing inserted block was misclassified as a column");
+if (!ColumnTargeting.IsColumnLabel("COLUMN", "0") || !ColumnTargeting.IsColumnLabel("STRUCT_COLUMN_A", "0"))
+    throw new Exception("Column block was not recognized");
+var columns = new[]
+{
+    new ColumnCandidate("A", "COLUMN", 0, 0),
+    new ColumnCandidate("B", "COLUMN", 1000, 0),
+    new ColumnCandidate("C", "COLUMN", 2000, 0)
+};
+if (!ColumnTargeting.TryThirdFromLeft(columns, out var third, out _) || third?.Handle != "C")
+    throw new Exception("Third column was not suggested");
+var repeated = new[] { columns[0], columns[1], columns[1] with { Handle = "D" } };
+if (ColumnTargeting.TryThirdFromLeft(repeated, out _, out _))
+    throw new Exception("Overlapping columns were accepted");
+var multipleRows = new[] { columns[0], columns[1], columns[2] with { Y = 1000 } };
+if (ColumnTargeting.TryThirdFromLeft(multipleRows, out _, out _))
+    throw new Exception("Multiple rows were accepted");
+Console.WriteLine($"{cases.Length + 6} parser and targeting checks passed");

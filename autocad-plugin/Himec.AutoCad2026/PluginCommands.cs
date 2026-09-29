@@ -51,6 +51,12 @@ public sealed class PluginCommands : IExtensionApplication
         using var tr = doc.TransactionManager.StartTransaction();
         var block = tr.GetObject(picked.ObjectId, OpenMode.ForRead) as BlockReference;
         if (block is null) return;
+        if (!ColumnTargeting.IsColumnLabel(block.Name, block.Layer))
+        {
+            _panel?.SetTarget($"선택 거절: {block.Name}은 기둥 블록으로 식별되지 않습니다.");
+            _panel?.SetStatus("도면 전체를 블록으로 삽입했다면 DXF 파일을 '열기'로 열어주세요. v0은 기둥 블록만 이동합니다.");
+            return;
+        }
         CurrentInstruction.TargetHandle = block.Handle.ToString();
         CurrentInstruction.TargetDrawing = doc.Name;
         CurrentInstruction.Status = "needs_review";
@@ -74,30 +80,20 @@ public sealed class PluginCommands : IExtensionApplication
         }
         using var tr = doc.TransactionManager.StartTransaction();
         var space = (BlockTableRecord)tr.GetObject(doc.Database.CurrentSpaceId, OpenMode.ForRead);
-        var columns = new List<BlockReference>();
+        var columns = new List<ColumnCandidate>();
         foreach (ObjectId id in space)
         {
             if (tr.GetObject(id, OpenMode.ForRead) is not BlockReference block) continue;
-            var label = (block.Name + " " + block.Layer).ToUpperInvariant();
-            if (label.Contains("COLUMN") || label.Contains("기둥") ||
-                System.Text.RegularExpressions.Regex.IsMatch(label, @"\bC\d+\b"))
-                columns.Add(block);
+            if (ColumnTargeting.IsColumnLabel(block.Name, block.Layer))
+                columns.Add(new ColumnCandidate(block.Handle.ToString(), block.Name, block.Position.X, block.Position.Y));
         }
-        if (columns.Count < 3)
+        if (!ColumnTargeting.TryThirdFromLeft(columns, out var candidate, out var reason))
         {
-            _panel?.SetStatus($"기둥 후보가 {columns.Count}개뿐이어서 세 번째를 고를 수 없습니다. 직접 선택하세요.");
+            _panel?.SetStatus(reason);
             return;
         }
-        var minY = columns.Min(x => x.Position.Y);
-        var maxY = columns.Max(x => x.Position.Y);
-        if (maxY - minY > 1.0)
-        {
-            _panel?.SetStatus("기둥 후보가 여러 줄에 있어 '왼쪽 세 번째' 기준이 모호합니다. 직접 선택하세요.");
-            return;
-        }
-        var candidate = columns.OrderBy(x => x.Position.X).ElementAt(2);
-        _panel?.SetTarget($"추천 후보(미확정): {candidate.Name} / handle {candidate.Handle} / X={candidate.Position.X:0.##}. 직접 선택해 확정하세요.");
-        _panel?.SetStatus("추천은 참고용입니다. 선택 버튼으로 도면 객체를 직접 클릭해야 승인할 수 있습니다.");
+        _panel?.SetTarget($"추천 후보(미확정): {candidate!.Name} / handle {candidate.Handle} / X={candidate.X:0.##}. 직접 선택해 확정하세요.");
+        _panel?.SetStatus(reason);
     }
 
     [CommandMethod("HIMEC_APPLY")]
@@ -127,7 +123,8 @@ public sealed class PluginCommands : IExtensionApplication
         {
             using var tr = doc.TransactionManager.StartTransaction();
             var block = tr.GetObject(SelectedObjectId, OpenMode.ForWrite, false) as BlockReference;
-            if (block is null || block.Handle.ToString() != change.TargetHandle)
+            if (block is null || block.Handle.ToString() != change.TargetHandle ||
+                !ColumnTargeting.IsColumnLabel(block.Name, block.Layer))
                 throw new InvalidOperationException("선택 객체가 변경되었거나 블록이 아닙니다.");
             var before = block.Position;
             block.TransformBy(Matrix3d.Displacement(new Vector3d(change.DxMm, change.DyMm, 0)));

@@ -7,11 +7,15 @@ internal static class OpenAiTranscriber
 {
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromMinutes(2) };
 
-    public static async Task<string> TranscribeAsync(string wavPath)
+    public static bool HasEnvironmentKey => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("OPENAI_API_KEY"));
+
+    public static async Task<string> TranscribeAsync(string wavPath, string? sessionKey = null)
     {
-        var key = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        var key = !string.IsNullOrWhiteSpace(sessionKey)
+            ? sessionKey.Trim()
+            : Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         if (string.IsNullOrWhiteSpace(key))
-            throw new InvalidOperationException("OPENAI_API_KEY가 로컬 환경변수에 없습니다. 전사문을 직접 입력할 수 있습니다.");
+            throw new InvalidOperationException("전사 API 키가 없습니다. 팔레트의 'API 키 입력'을 누르거나 전사문을 직접 입력하세요.");
         if (!File.Exists(wavPath)) throw new FileNotFoundException("녹음 파일을 찾을 수 없습니다.", wavPath);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/audio/transcriptions");
@@ -30,6 +34,9 @@ internal static class OpenAiTranscriber
         using var json = JsonDocument.Parse(body);
         if (!json.RootElement.TryGetProperty("text", out var text))
             throw new InvalidOperationException("전사 API 응답에 text가 없습니다.");
-        return text.GetString() ?? "";
+        var transcript = text.GetString();
+        if (string.IsNullOrWhiteSpace(transcript))
+            throw new InvalidOperationException("전사 결과가 비어 있습니다. 녹음 장치와 음성을 확인한 뒤 다시 시도하세요.");
+        return transcript;
     }
 }
