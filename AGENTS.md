@@ -36,7 +36,7 @@
 - 공식 원본은 `sources/official/`에 변형 없이 보존하고, 해석은 별도 Markdown 파일에 작성한다.
 - 외부 SDK/API, 공모전 규정, 호환성은 공식 자료나 실제 실행으로 확인한다.
 - 생성형 AI 결과는 사실 검증과 팀 검토 없이 최종 근거로 사용하지 않는다.
-- 개인정보, 고객 자료, API 키, 토큰을 코드·문서·로그·커밋에 넣지 않는다.
+- 개인정보, 고객 자료, API 키, 토큰을 코드·문서·로그·커밋에 넣지 않는다. 단, `prototype/CONTRACT.md`에 기록된 PR #52의 마스킹 도면·이미지 공개 예외는 그 명시된 파일에만 적용한다.
 - 서명·생년월일·전화번호 등이 적힌 참가 서류는 절대 Git에 올리지 않고 `submission-private/` 또는 저장소 밖에서 관리한다.
 - C 단계 합성 DXF 단위 검증: `python -m unittest discover -s prototype/tests -v` (`ezdxf` 설치 필요). A/B/D와 연결한 전체 통합 검증 명령은 아직 미정이다.
 - 플러그인 파서 검증: `dotnet run --project autocad-plugin/Himec.ChangeCore.Tests/Himec.ChangeCore.Tests.csproj`; 호스트 빌드: `dotnet build autocad-plugin/Himec.AutoCad2026/Himec.AutoCad2026.csproj -c Release`. 실제 AutoCAD 로드·실행은 별도 스모크 테스트가 필요하다.

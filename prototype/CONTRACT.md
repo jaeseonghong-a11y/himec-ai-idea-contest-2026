@@ -11,7 +11,9 @@
 | `prototype/propagate/`, `prototype/run_demo.py` | C 팀장 | 승인 목록·DXF → 수정 DXF·검사 보고서 |
 | `prototype/graph/` | D `ehgudwns18` | 사이드카 → 관계 그래프·그림 (선택 기능) |
 
-공통 `prototype/CONTRACT.md`, `docs/PROJECT_BRIEF.md`, `CURRENT_STATE.md`, `prototype/README.md`는 팀장만 편집한다. 각 팀원의 코드는 다른 담당자의 디렉터리를 수정하지 않는다. 생성 결과는 `prototype/out/`에 저장하고 Git에는 재현에 필요한 작은 합성 예시만 선택적으로 포함한다. 개인·고객 도면, 키, 실제 회의록은 금지한다.
+공통 `prototype/CONTRACT.md`, `docs/PROJECT_BRIEF.md`, `CURRENT_STATE.md`, `prototype/README.md`는 팀장만 편집한다. 각 팀원의 코드는 다른 담당자의 디렉터리를 수정하지 않는다. 생성 결과는 `prototype/out/`에 저장하고 Git에는 재현에 필요한 작은 합성 예시만 선택적으로 포함한다. 개인·고객 도면, 키, 실제 회의록은 원칙적으로 금지한다.
+
+2026-09-30 승인 예외: 팀장 요청으로 병합한 PR #52의 `prototype/relation-editor/real_dxf/A12~A15.dxf` 4장과 같은 PR의 `scenario/` 이미지만 공개 대상이다. 김기준 팀원은 건축주 동의와 마스킹을 PR에 진술했고, 팀장은 그 진술을 신뢰해 공개 병합을 승인했다. 동의 원본이나 도면 저작권은 이 저장소에서 독립 검증하지 않았다. 이 예외는 다른 실제 도면·캡처·원본 파일의 추가 공개 허가가 아니다. 관계도 편집기는 기존 A/B/C/D 계약과 별도의 독립 프로토타입이며, #17 합성 3장·대본·사이드카 산출물을 대체하지 않는다.
 
 ## 공통 합성 사례
 
