@@ -15,6 +15,8 @@
 
 ## Recommended Next Step
 
+0. 실시간 음성 전사·객체 태그는 아직 구현하지 않았다. 먼저 `docs/REALTIME_SPEECH_OBJECT_TAGGING_PLAN.md`의 RT-01을 한 팀원에게 새 배정 브랜치로 주고 `prompts/TEAM_IMPLEMENT_REALTIME_TAGS.md`를 붙여 넣는다. RT-01 병합 뒤 RT-02·RT-04를 분리 배정하고, 이 계획 단계에서는 실제 API 키·음성·도면을 사용하지 않는다.
+
 1. 기존 미저장 `Drawing1.dwg`의 시험 변경은 `autocad-plugin/dist/Drawing1-session-backup-20260929-155328.dwg`로 보존하고 다시 열어 두었다. 새 태그 기능은 합성 WAV와 `three_columns_mm.dxf`를 **삽입이 아닌 열기**로 연 시험 사본에서 객체 연결·이름 편집·재열기를 검사한다. 실제 프로젝트 도면은 사용하지 않는다. 키는 사용자가 가림 입력창에 직접 넣고 시험용 음성으로 API 전사를 별도 확인한다. 이후 후보/수동 선택·승인·블록 이동/UNDO도 별도 시험한다.
 2. 팀원에게 `prompts/ROUND_02_START.md`와 플러그인 설치가 필요하면 `prompts/TEAM_INSTALL_AUTOCAD_PLUGIN.md`를 전달한다. #17/#18/#20은 기존 계획대로 진행하고, 입력/출력 계약과 플러그인 연계는 통합 시 확인한다.
 3. 팀장 AI가 팀원 PR을 통합해 #19를 재검증하고, 출품 문안에는 실제 구현·검증된 부분만 반영한다.

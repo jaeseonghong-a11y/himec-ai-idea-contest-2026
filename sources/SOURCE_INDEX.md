@@ -1,5 +1,7 @@
 # SOURCE INDEX
 
+> 최신 등록 — **SRC-006 OpenAI 실시간 전사·발화 경계·파일 전사 가이드**: [Realtime transcription guide](https://developers.openai.com/api/docs/guides/realtime-transcription), `SRC-006_OPENAI_REALTIME_TRANSCRIPTION.md`, 확인일 2026-09-29, 상태: 실시간 전사 세션·24 kHz PCM·부분/완료 이벤트·수동 commit·제약 확인.
+
 이 디렉터리는 모든 AI와 팀원이 공유하는 근거 저장소다. 공식 원본과 분석 문서를 분리하고, 확인하지 않은 내용을 사실처럼 쓰지 않는다.
 
 | ID | 자료 | 유형 | 원본 위치 | 확인일 | 상태 |
