@@ -14,6 +14,7 @@
 | SRC-006 | OpenAI 실시간 전사 API | 공급자 공식 개발 문서 | [Realtime transcription](https://developers.openai.com/api/docs/guides/realtime-transcription), `SRC-006_OPENAI_REALTIME_TRANSCRIPTION.md` | 2026-09-29 | 세션·PCM·완료 이벤트 확인 |
 | SRC-007 | Gemini 파일·실시간 음성 전사 | 공급자 공식 개발 문서 | [Audio understanding](https://ai.google.dev/gemini-api/docs/generate-content/audio), [Live transcription](https://ai.google.dev/gemini-api/docs/live-api/live-transcribe) | 2026-09-29 | REST WAV 입력, WebSocket 16 kHz PCM/이벤트 확인·실계정 미검증 |
 | SRC-008 | Claude Messages API와 입력 형식 | 공급자 공식 개발 문서 | [Messages API](https://platform.claude.com/docs/en/api/messages/create), [Features overview](https://platform.claude.com/docs/en/build-with-claude/overview) | 2026-09-29 | 텍스트 검토 호출 확인·직접 WAV 전사 경로 없음·실계정 미검증 |
+| SRC-009 | Gemini 503 오류·재시도·대체 음성 입력 모델 | 공급자 공식 개발 문서 | [API errors](https://ai.google.dev/gemini-api/docs/api-errors), [Troubleshooting](https://ai.google.dev/gemini-api/docs/troubleshooting), [Gemini 3.5 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash) | 2026-09-30 | 503은 일시적 서비스 불가/과부하, 제한된 지수 재시도 권장, 3.5 Flash 음성 입력 지원 확인 |
 
 ## 원본 무결성
 

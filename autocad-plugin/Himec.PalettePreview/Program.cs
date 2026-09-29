@@ -1,4 +1,6 @@
 using System.Drawing;
+using System.Net;
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Windows.Forms;
@@ -105,6 +107,7 @@ internal static class Program
                 ?? throw new InvalidOperationException("No generic 429 message."));
             if (noLeak.Contains("secret-value")) throw new InvalidOperationException("Untrusted error code leaked into UI.");
             describe.Invoke(null, [429, "{\"error\":\"malformed\"}"]);
+            TestGeminiHttp(type);
             var speechProvider = (ComboBox)(type.GetField("_speechProvider", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(panel)
                 ?? throw new InvalidOperationException("Speech provider selector not found."));
             var reviewProvider = (ComboBox)(type.GetField("_reviewProvider", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(panel)
@@ -200,6 +203,62 @@ internal static class Program
         {
             if (File.Exists(path)) File.Delete(path);
             if (File.Exists(sessionPath)) File.Delete(sessionPath);
+        }
+    }
+
+    private static void TestGeminiHttp(Type panelType)
+    {
+        var providers = panelType.Assembly.GetType("Himec.AutoCad2026.AiProviders")!;
+        var send = providers.GetMethod("SendGeminiTranscriptionAsync", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var describe = providers.GetMethod("DescribeHttpError", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var providerEnum = panelType.Assembly.GetType("Himec.AutoCad2026.AiProvider")!;
+        var gemini = Enum.Parse(providerEnum, "Gemini");
+        var message = (string)describe.Invoke(null, [gemini, 503, 3])!;
+        if (!message.Contains("과부하") || message.Contains("결제") || message.Contains("test-secret"))
+            throw new InvalidOperationException("503 incorrectly diagnosed as an account issue.");
+        using var handler = new FakeGeminiHandler([503, 503, 200]);
+        using var client = new HttpClient(handler);
+        var pause = new Func<TimeSpan, Task>(_ => Task.CompletedTask);
+        var task = (Task)send.Invoke(null, [client, new { contents = Array.Empty<object>() }, "test-secret", pause])!;
+        task.GetAwaiter().GetResult();
+        var result = task.GetType().GetProperty("Result")!.GetValue(task)!;
+        if (handler.Requests.Count != 3 ||
+            handler.Requests[0] != "gemini-3.8-flash" ||
+            handler.Requests[1] != "gemini-3.8-flash" ||
+            handler.Requests[2] != "gemini-3.5-flash" ||
+            (string)result.GetType().GetProperty("Text")!.GetValue(result)! != "C1 기둥")
+            throw new InvalidOperationException("Gemini bounded retry/fallback failed.");
+        using var deniedHandler = new FakeGeminiHandler([403, 200]);
+        using var deniedClient = new HttpClient(deniedHandler);
+        try
+        {
+            ((Task)send.Invoke(null, [deniedClient, new { }, "test-secret", pause])!).GetAwaiter().GetResult();
+            throw new InvalidOperationException("Gemini 403 unexpectedly succeeded.");
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("403")) { }
+        if (deniedHandler.Requests.Count != 1) throw new InvalidOperationException("Auth failure was retried.");
+        using var quotaHandler = new FakeGeminiHandler([429, 200]);
+        using var quotaClient = new HttpClient(quotaHandler);
+        try
+        {
+            ((Task)send.Invoke(null, [quotaClient, new { }, "test-secret", pause])!).GetAwaiter().GetResult();
+            throw new InvalidOperationException("Gemini 429 unexpectedly succeeded.");
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("429")) { }
+        if (quotaHandler.Requests.Count != 1) throw new InvalidOperationException("Quota failure was retried.");
+    }
+
+    private sealed class FakeGeminiHandler(int[] statuses) : HttpMessageHandler
+    {
+        public List<string> Requests { get; } = [];
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Headers.GetValues("x-goog-api-key").Single() != "test-secret")
+                throw new InvalidOperationException("Gemini key header was lost.");
+            Requests.Add(request.RequestUri!.AbsolutePath.Split('/')[3].Split(':')[0]);
+            var status = statuses[Math.Min(Requests.Count - 1, statuses.Length - 1)];
+            var body = status == 200 ? "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"C1 기둥\"}]}}]}" : "{\"error\":{\"message\":\"secret-value\"}}";
+            return Task.FromResult(new HttpResponseMessage((HttpStatusCode)status) { Content = new StringContent(body) });
         }
     }
 }
