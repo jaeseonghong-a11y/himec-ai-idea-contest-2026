@@ -11,6 +11,15 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "--test-wav")
+        {
+            var destination = args.Length > 1 ? args[1] : throw new ArgumentException("Output WAV path required.");
+            if (File.Exists(destination)) throw new IOException("Test WAV already exists; refusing overwrite.");
+            using (var writer = new WaveFileWriter(destination, new WaveFormat(16000, 16, 1)))
+                writer.Write(new byte[32000], 0, 32000);
+            Console.WriteLine(destination);
+            return;
+        }
         AssemblyLoadContext.Default.Resolving += (_, name) =>
         {
             var path = Path.Combine(@"C:\Program Files\Autodesk\AutoCAD 2026", name.Name + ".dll");
@@ -49,6 +58,10 @@ internal static class Program
     private static void TestAudioPickerState(Type type, Control panel)
     {
         var path = Path.Combine(Path.GetTempPath(), "himec-preview-test-" + Guid.NewGuid().ToString("N") + ".wav");
+        var store = type.Assembly.GetType("Himec.AutoCad2026.RecordingTagStore")
+            ?? throw new InvalidOperationException("RecordingTagStore not found.");
+        var sessionPath = (string)(store.GetMethod("SessionFile", BindingFlags.Static | BindingFlags.NonPublic)?.Invoke(null, [path])
+            ?? throw new InvalidOperationException("SessionFile not found."));
         try
         {
             using (var writer = new WaveFileWriter(path, new WaveFormat(16000, 16, 1)))
@@ -65,11 +78,26 @@ internal static class Program
                 ?? throw new InvalidOperationException("Status label not found."));
             if (!status.Text.Contains("전사 실패", StringComparison.Ordinal))
                 throw new InvalidOperationException("Transcription error was not shown.");
-            Console.WriteLine("Palette audio-selection and error-status checks passed");
+            var tagPanel = type.GetField("_tagReview", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(panel)
+                ?? throw new InvalidOperationException("Tag review panel not found.");
+            var tagType = tagPanel.GetType();
+            tagType.GetMethod("AddTranscriptMentions")!.Invoke(tagPanel, ["C1 기둥을 옮기자. 덕트도 확인하자."]);
+            var grid = (DataGridView)(tagType.GetField("_grid", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(tagPanel)
+                ?? throw new InvalidOperationException("Tag grid not found."));
+            if (grid.Rows.Count != 2) throw new InvalidOperationException("Transcript tag rows were not shown.");
+            grid.CurrentCell = grid.Rows[0].Cells[1];
+            tagType.GetField("_pendingTagId", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(tagPanel, grid.Rows[0].Tag as string);
+            tagType.GetMethod("CompletePick")!.Invoke(tagPanel, ["synthetic.dxf", "1A", "BlockReference", "COLUMN"]);
+            if (Convert.ToString(grid.Rows[0].Cells[2].Value) != "지정 완료")
+                throw new InvalidOperationException("Tag-object link was not shown.");
+            if (!File.Exists(sessionPath)) throw new InvalidOperationException("Tag session was not saved.");
+            Console.WriteLine("Palette audio, error, transcript-tag list, object-link and local-save checks passed");
         }
         finally
         {
             if (File.Exists(path)) File.Delete(path);
+            if (File.Exists(sessionPath)) File.Delete(sessionPath);
         }
     }
 }

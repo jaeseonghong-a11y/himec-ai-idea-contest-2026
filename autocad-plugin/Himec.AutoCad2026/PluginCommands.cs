@@ -34,6 +34,19 @@ public sealed class PluginCommands : IExtensionApplication
         _palette.Visible = true;
     }
 
+    [CommandMethod("HIMEC_TAG_PICK")]
+    public void PickRecordingTagObject()
+    {
+        var doc = AcadApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) { _panel?.SetStatus("태그할 도면이 열려 있지 않습니다."); return; }
+        var picked = doc.Editor.GetEntity(new PromptEntityOptions("\n태그에 연결할 도면 객체를 선택하세요: "));
+        if (picked.Status != PromptStatus.OK) { _panel?.SetStatus("객체 태그 선택을 취소했습니다."); return; }
+        using var tr = doc.TransactionManager.StartTransaction();
+        var entity = tr.GetObject(picked.ObjectId, OpenMode.ForRead) as Entity;
+        if (entity is null) { _panel?.SetStatus("선택한 객체를 읽을 수 없습니다."); return; }
+        _panel?.TagPicked(doc.Name, entity.Handle.ToString(), entity.GetType().Name, entity.Layer);
+    }
+
     [CommandMethod("HIMEC_PICK")]
     public void PickTarget()
     {

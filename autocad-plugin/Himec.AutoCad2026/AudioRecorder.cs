@@ -58,8 +58,10 @@ internal sealed class AudioRecorder : IDisposable
 
     public Task<string> StopAsync()
     {
-        if (_input is null || _stopped is null) throw new InvalidOperationException("녹음 중이 아닙니다.");
-        _input.StopRecording();
+        if (_stopped is null) throw new InvalidOperationException("녹음 중이 아닙니다.");
+        // The size cap can stop the device before the user presses Stop.
+        // In that case return the completed recording instead of losing its path.
+        _input?.StopRecording();
         return _stopped.Task;
     }
 
