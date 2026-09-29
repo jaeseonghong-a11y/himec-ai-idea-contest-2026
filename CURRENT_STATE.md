@@ -1,8 +1,11 @@
 # CURRENT_STATE.md — 최신 인수인계
 
-## 현재 상태 (2026-09-29, 팀장 AI)
+## 현재 상태 (2026-09-30, 팀장 AI)
 
-- Gemini 파일 전사 후속 [#47](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/47): 사용자 PC의 `v0.5.0-lab`에서 HTTP 503 화면 확인. Google 공식 기준 503은 서비스 일시 불가/과부하이며 화면의 기존 결제·권한 안내는 과도한 일반화다. [PR #48](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/48)에 Gemini 파일 전사 최대 3회(3.8 Flash 2회, 3.5 Flash 1회) 제한 재시도, 성공 모델 표시, 401/403/429 비재시도, 상태별 안전한 오류 문구를 병합했다. [v0.5.1-lab 시험판](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/releases/tag/v0.5.1-lab)을 배포하고 원격 ZIP SHA-256 `83615C7E5AC1D6BBC36BED6702A309240EC5B19C579D1C07BDEA0A905D0F1DF9` 일치를 확인했다. 합성 HTTP 테스트와 빌드는 통과했으나 실제 키·음성으로 성공 여부는 아직 검증 전이다. `sources/SRC-009_GEMINI_503.md` 참조. AutoCAD가 실행 중이라 현 설치판은 아직 0.5.0이다.
+- 2026-09-30 김기준 팀원 [PR #52](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/52)를 원본 SHA `ba434aa` 검토 후 squash 병합(`8dde212`)했다. `prototype/relation-editor/` 독립 관계도 편집기·DXF 생성/재읽기·마스킹 도면 4장·시나리오 이미지를 기존 기능과 함께 보존했다. 팀원 주장과 팀장 승인에 따른 실제 도면 공개 예외는 `prototype/CONTRACT.md` 참조. 원본 동의·저작권은 독립 검증 전이다. 검증: 도면 4장 문자열 마스킹 검사, 새 프로젝트 로직 75/75·기존 도면 44/44, 합성 계획안 2종의 DXF 재읽기 33/33, Edge 새 프로젝트 화면 29/29. 기존 플러그인과 런타임 연결은 하지 않았고, 김기준 PC의 AutoCAD 2024 결과는 이 PC에서 재검증하지 않았다. #17의 합성 A-101/A-301/E-201·대본·사이드카 계약은 별도 미완료다.
+- 사용자 PC의 AutoCAD 종료 후 v0.5.1-lab 번들을 설치했고 매니페스트 `0.5.1.0`과 DLL SHA-256 `F40C372A70BFB21B81A967050AA56E61C4927E3DC142AB7850556AB3ED291F59`를 확인했다. 이전 번들은 ApplicationPlugins의 `.himec-backups`에 보존했다. 사용자 Gemini 503이 이 버전에서 해결됐는지는 AutoCAD 재시작 후 같은 시험 WAV로 확인해야 한다.
+
+- Gemini 파일 전사 후속 [#47](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/47): 사용자 PC의 `v0.5.0-lab`에서 HTTP 503 화면 확인. Google 공식 기준 503은 서비스 일시 불가/과부하이며 화면의 기존 결제·권한 안내는 과도한 일반화다. [PR #48](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/48)에 Gemini 파일 전사 최대 3회(3.8 Flash 2회, 3.5 Flash 1회) 제한 재시도, 성공 모델 표시, 401/403/429 비재시도, 상태별 안전한 오류 문구를 병합했다. [v0.5.1-lab 시험판](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/releases/tag/v0.5.1-lab)을 배포하고 원격 ZIP SHA-256 `83615C7E5AC1D6BBC36BED6702A309240EC5B19C579D1C07BDEA0A905D0F1DF9` 일치를 확인했다. 합성 HTTP 테스트와 빌드는 통과했으나 실제 키·음성으로 성공 여부는 아직 검증 전이다. `sources/SRC-009_GEMINI_503.md` 참조. 현재 사용자 PC에는 0.5.1을 설치했다.
 
 - 제공자 통합 [#42](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/42), [PR #43](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/43): AutoCAD 2026용 소스에 OpenAI/Gemini 녹음 후·실시간 전사 선택과 OpenAI/Gemini/Claude 전사문 AI 검토를 추가했다. [v0.5.0-lab 시험판](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/releases/tag/v0.5.0-lab) ZIP 13파일을 배포하고 원격 재다운로드 SHA-256 `3EE31B682AE5A399AF07AF3811A21C79E0A41FA44DA44CF2437C6ED835DA9AC5` 일치를 확인했다. 2026-09-30 AutoCAD 종료 상태에서 사용자 PC에 설치해 매니페스트 `0.5.0.0`과 DLL SHA-256 `20105A93D4F7C6DD3D3A3EE0F01001F240039BB45C73CCE2DFDFF536D77DF25E`를 확인했다. 이전 0.4.3 번들은 사용자 ApplicationPlugins의 `.himec-backups`에 보존했다. Claude 직접 WAV 전사는 지원하지 않으며 AI 검토 결과는 읽기 전용 제안이다. 합성 팔레트/이벤트 테스트와 빌드는 통과했으나 **실계정 호출·AutoCAD 호스트·마이크는 미검증**이다. Computer Use 연결은 native pipe 오류로 3회 실패하여 호스트 화면 시험을 진행하지 못했다. 키는 Git에 두지 않는다. 공급자 근거는 `sources/SRC-007_008_PROVIDER_APIS.md`.
 
@@ -26,11 +29,11 @@
 
 ## Recommended Next Step
 
-0. #47 수정판을 시험 배포하고 AutoCAD 종료 후 사용자 PC에 설치한다. 동일한 **시험용** WAV로 Gemini 전사를 다시 시도해 모델명/실제 오류를 확인한다. 키·녹음 파일·전체 서버 응답을 GitHub에 기록하지 않는다.
+0. AutoCAD 2026을 다시 열어 설치된 v0.5.1-lab에서 동일한 **시험용** WAV로 Gemini 전사를 재시도하고 성공 모델명 또는 상태 코드를 확인한다. 키·녹음 파일·전체 서버 응답을 GitHub에 기록하지 않는다.
 
-0. 사용자 PC에는 `v0.5.0-lab` 설치가 완료됐다. AutoCAD 2026을 다시 열고 합성 도면에서 `HIMEC` 팔레트의 두 제공자 선택기를 먼저 확인한다. 이후 합성 WAV/도면과 각자 소유한 API 키로 OpenAI·Gemini 전사, Claude 포함 세 제공자의 텍스트 검토를 각각 동의하에 확인한다. 실제 응답과 429 원인은 키·음성·도면 없이 상태 코드와 검증 결과만 #42에 남긴다.
+0. 관계도 편집기와 플러그인은 아직 별도 데모다. `prototype/relation-editor/README.md`로 관계도 데모를 재현하고, A/B/C/D 계약과 연결할 데이터 변환은 후속 과제로 정한다. 실제 공개 도면을 다른 서비스/API에 전송하거나 추가 공개하지 않는다.
 
-0. `v0.4.3-lab`은 소스·합성 검사와 ZIP 배포까지만 끝났다. 현재 AutoCAD를 저장 후 완전히 종료한 다음 실험판을 설치하고 **합성 시험 도면**으로 팔레트 크기 조절, 단일/복수 객체 태그, 선택 강조, 24 kHz 녹음·재열기를 확인한다. 사용자 자신의 OpenAI API 계정에서 결제·한도를 확인한 뒤에만 시험용 음성을 명시적 동의로 전송하여 실제 429 코드와 실시간 전사를 확인한다. 오류가 나면 로컬 WAV와 구버전 백업을 보존하고 보고한다. 실제 키·음성·도면은 Git에 올리지 않는다.
+0. 합성 시험 도면에서 팔레트 크기 조절, 단일/복수 객체 태그, 선택 강조, 24 kHz 녹음·재열기를 현 설치판으로 검증한다. 시험용 음성의 외부 전송은 사용자 동의 후 수행하며, 오류가 나면 로컬 WAV와 구버전 백업을 보존한다.
 
 1. 기존 미저장 `Drawing1.dwg`의 시험 변경은 `autocad-plugin/dist/Drawing1-session-backup-20260929-155328.dwg`로 보존하고 다시 열어 두었다. 새 태그 기능은 합성 WAV와 `three_columns_mm.dxf`를 **삽입이 아닌 열기**로 연 시험 사본에서 객체 연결·이름 편집·재열기를 검사한다. 실제 프로젝트 도면은 사용하지 않는다. 키는 사용자가 가림 입력창에 직접 넣고 시험용 음성으로 API 전사를 별도 확인한다. 이후 후보/수동 선택·승인·블록 이동/UNDO도 별도 시험한다.
 2. 팀원에게 `prompts/ROUND_02_START.md`와 플러그인 설치가 필요하면 `prompts/TEAM_INSTALL_AUTOCAD_PLUGIN.md`를 전달한다. #17/#18/#20은 기존 계획대로 진행하고, 입력/출력 계약과 플러그인 연계는 통합 시 확인한다.

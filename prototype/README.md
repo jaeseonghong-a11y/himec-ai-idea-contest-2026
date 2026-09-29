@@ -9,4 +9,4 @@ python -m unittest discover -s prototype/tests -v
 python prototype/run_demo.py --changes prototype/out/changes.json --samples prototype/samples --sidecars prototype/out --output prototype/out/propagated
 ```
 
-두 번째 명령은 A의 DXF·사이드카와 B의 승인된 changes.json이 준비된 뒤에만 실행된다. 같은 출력 폴더를 덮어쓰지 않으므로 재실행할 때 `--output`에 새 경로를 지정한다. 원본 샘플은 수정하지 않는다. API 키·고객 도면·개인정보를 저장소에 넣지 않는다.
+두 번째 명령은 A의 DXF·사이드카와 B의 승인된 changes.json이 준비된 뒤에만 실행된다. 같은 출력 폴더를 덮어쓰지 않으므로 재실행할 때 `--output`에 새 경로를 지정한다. 원본 샘플은 수정하지 않는다. API 키·고객 도면·개인정보를 저장소에 넣지 않는다. 공개 예외는 `CONTRACT.md`의 관계도 프로토타입 4장에만 한정된다.
