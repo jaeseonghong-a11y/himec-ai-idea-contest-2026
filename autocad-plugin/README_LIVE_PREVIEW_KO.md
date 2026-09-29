@@ -1,8 +1,8 @@
 # AutoCAD 2026 실시간 전사·객체 태그 개발판
 
-## 3개 AI 제공자 통합 개발 브랜치 (#42)
+## 3개 AI 제공자 통합 시험판 v0.5.0-lab (#42)
 
-`v0.4.3-lab` 설치판은 여전히 OpenAI 전용입니다. 이 절의 새 기능은 #42 소스 브랜치에 있으며, 새 버전 설치 전에는 화면에 나타나지 않습니다. 빌드·합성 팔레트 검사는 통과했지만 **실제 계정, 마이크, AutoCAD 호스트 호출은 미검증**입니다.
+`v0.4.3-lab` 설치판은 여전히 OpenAI 전용입니다. 이 절의 새 기능은 `v0.5.0-lab`에 들어 있습니다. 새 버전을 설치하고 AutoCAD를 다시 열기 전에는 화면에 나타나지 않습니다. 빌드·합성 팔레트 검사는 통과했지만 **실제 계정, 마이크, AutoCAD 호스트 호출은 미검증**입니다.
 
 1. `음성 전사 제공자`에서 OpenAI 또는 Gemini를 선택합니다. Claude는 음성 전사 제공자가 아닙니다.
 2. `전사 API 키 입력`에 해당 제공자의 키를 입력합니다. 각 키는 이번 실행 메모리에만 유지됩니다. 로컬 환경변수 `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`도 사용할 수 있습니다.
@@ -12,7 +12,7 @@
 
 제공자별 API 오류는 HTTP 상태만 표시하고 서버 응답 본문·키는 표시하지 않습니다. 각 서비스의 결제/모델 접근 조건은 별개입니다. 실계정 검증 전에는 기능 완료나 429 해결로 간주하지 않습니다. 공식 API 근거는 [`SRC-007_008_PROVIDER_APIS.md`](../sources/SRC-007_008_PROVIDER_APIS.md)를 참고하세요.
 
-이 문서는 [v0.4.3-lab 실험판](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/releases/tag/v0.4.3-lab)의 개발 동작을 설명한다. 기존 `v0.3.1-preview` ZIP에는 이 기능이 없다. **AutoCAD 호스트·실제 OpenAI 계정 검증 전에는 완성판으로 취급하지 않는다.**
+이 문서는 `v0.5.0-lab`의 제공자 통합과 [v0.4.3-lab 실험판](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/releases/tag/v0.4.3-lab)에서 시작한 OpenAI 실시간 전사 동작을 설명한다. 기존 `v0.3.1-preview` ZIP에는 실시간 기능이 없다. **AutoCAD 호스트·실제 API 계정 검증 전에는 완성판으로 취급하지 않는다.**
 
 ## 사용 흐름
 

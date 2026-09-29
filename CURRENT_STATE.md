@@ -2,7 +2,7 @@
 
 ## 현재 상태 (2026-09-29, 팀장 AI)
 
-- 제공자 통합 [#42](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/42): AutoCAD 2026용 개발 소스에 OpenAI/Gemini 녹음 후·실시간 전사 선택과 OpenAI/Gemini/Claude 전사문 AI 검토를 추가했다. Claude 직접 WAV 전사는 공식 입력 경로가 확인되지 않아 지원하지 않는다. AI 검토 결과는 읽기 전용 제안이며 기존 로컬 이동량 추출·대상 확인·사람 승인·실행을 대체하지 않는다. 합성 팔레트/이벤트 테스트와 빌드는 통과했으나 **실계정 호출·AutoCAD 호스트·마이크는 미검증**이다. 사용자 PC에 설치된 `v0.4.3-lab`에는 이 새 기능이 아직 없다. 키는 Git에 두지 않는다. 공급자 근거는 `sources/SRC-007_008_PROVIDER_APIS.md`.
+- 제공자 통합 [#42](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/42), [PR #43](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/43): AutoCAD 2026용 소스에 OpenAI/Gemini 녹음 후·실시간 전사 선택과 OpenAI/Gemini/Claude 전사문 AI 검토를 추가했다. Claude 직접 WAV 전사는 공식 입력 경로가 확인되지 않아 지원하지 않는다. AI 검토 결과는 읽기 전용 제안이며 기존 로컬 이동량 추출·대상 확인·사람 승인·실행을 대체하지 않는다. 합성 팔레트/이벤트 테스트와 빌드는 통과했으나 **실계정 호출·AutoCAD 호스트·마이크는 미검증**이다. 사용자 PC에 설치된 `v0.4.3-lab`에는 이 새 기능이 아직 없다. 키는 Git에 두지 않는다. 공급자 근거는 `sources/SRC-007_008_PROVIDER_APIS.md`.
 
 - 실시간 전사 후속 [#39](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/39): [PR #40](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/40)의 소스를 `main`에 병합하고 [v0.4.3-lab 실험판](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/releases/tag/v0.4.3-lab)을 예비 배포했다. 24 kHz 로컬 녹음에서 명시적 체크박스 동의 후 WebSocket 전송, 확정 문장만 로컬 태그에 반영하는 코드다. ChangeCore 테스트·독립 UI/합성 이벤트·Release 빌드·13파일 ZIP 및 원격 재다운로드 SHA-256 `46EA40520CA83DF66091018DA4F3ADF8B4DCFE17A1F4F092C449BA464555DBA9`를 확인했다. **실제 AutoCAD 마이크/API 연결과 사용자 계정의 429 원인은 미검증**이다. 기존 `v0.3.1-preview`는 그대로 두었고 설치는 아직 하지 않았다. 사용법은 `autocad-plugin/README_LIVE_PREVIEW_KO.md`를 따른다.
 
@@ -24,7 +24,7 @@
 
 ## Recommended Next Step
 
-0. #42의 새 버전을 배포·설치하기 전에는 `v0.4.3-lab`이 OpenAI 전용임을 유지한다. 배포 후 합성 WAV/도면과 각자 소유한 API 키로 OpenAI·Gemini 전사, Claude 포함 세 제공자의 텍스트 검토를 각각 동의하에 확인한다. 실제 응답과 429 원인은 키·음성·도면 없이 상태 코드와 검증 결과만 이슈에 남긴다.
+0. `v0.5.0-lab`을 설치하려면 AutoCAD를 저장 후 완전히 닫아야 한다. 배포 후 합성 WAV/도면과 각자 소유한 API 키로 OpenAI·Gemini 전사, Claude 포함 세 제공자의 텍스트 검토를 각각 동의하에 확인한다. 실제 응답과 429 원인은 키·음성·도면 없이 상태 코드와 검증 결과만 #42에 남긴다.
 
 0. `v0.4.3-lab`은 소스·합성 검사와 ZIP 배포까지만 끝났다. 현재 AutoCAD를 저장 후 완전히 종료한 다음 실험판을 설치하고 **합성 시험 도면**으로 팔레트 크기 조절, 단일/복수 객체 태그, 선택 강조, 24 kHz 녹음·재열기를 확인한다. 사용자 자신의 OpenAI API 계정에서 결제·한도를 확인한 뒤에만 시험용 음성을 명시적 동의로 전송하여 실제 429 코드와 실시간 전사를 확인한다. 오류가 나면 로컬 WAV와 구버전 백업을 보존하고 보고한다. 실제 키·음성·도면은 Git에 올리지 않는다.
 
