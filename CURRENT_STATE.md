@@ -2,6 +2,8 @@
 
 ## 현재 상태 (2026-09-29, 팀장 AI)
 
+- 실시간 전사 후속 [#39](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/39): 24 kHz 로컬 녹음에서 명시적 체크박스 동의 후 OpenAI WebSocket으로만 음성을 전송하고, 확정 문장만 로컬 태그에 반영하는 개발 코드를 작성했다. 합성 이벤트·빌드 검증 중이며 실제 AutoCAD 마이크/API 계정 테스트는 아직 아니다. 기존 `v0.3.1-preview` 배포 ZIP은 바뀌지 않았다. `autocad-plugin/README_LIVE_PREVIEW_KO.md`에 사용법·한계를 기록한다.
+
 - 플러그인 후속 개선 [#37](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/37): HTTP 429의 세부 원인을 비밀값 없이 분류하고, 팔레트 최소 크기를 완화하며, 전사문 식별자가 도면의 정확히 한 블록에 일치할 때만 검토 전 자동 연결하는 변경을 진행 중이다. `선택된 객체 확인`은 도면 선택 강조만 하고 파일을 수정하지 않는다. 녹음 중 실시간 음성 전사 연결은 아직 별도 구현·호스트 검증이 필요하며, 사용자 API 계정의 429 원인은 세부 응답/결제 상태를 확인하기 전까지 미확정이다.
 
 - AutoCAD 2024 호환판: `archuni`에게 [#35](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/35)를 별도 배정했다. `work/archuni/r03`에서 2024 전용 .NET Framework 4.8 빌드·공존 번들·실제 호스트 검증을 진행한다. 기존 #18/PR #34는 유지한다. 2024 호환 기능은 아직 구현·검증되지 않았다.

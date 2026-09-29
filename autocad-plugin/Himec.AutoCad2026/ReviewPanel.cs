@@ -21,6 +21,10 @@ internal sealed class ReviewPanel : UserControl
     private readonly Button _chooseAudio = new() { Text = "이미 녹음한 WAV 선택", Width = 340 };
     private readonly Button _setApiKey = new() { Text = "전사 API 키 입력 (이번 실행에만 사용)", Width = 340 };
     private readonly Button _transcribe = new() { Text = "녹음 전사(API 호출)", Width = 340 };
+    private readonly Button _liveStart = new() { Text = "실시간 전사 시작", Width = 170, Enabled = false };
+    private readonly Button _liveStop = new() { Text = "실시간 전사 중지", Width = 170, Enabled = false };
+    private readonly Label _liveState = new() { Height = 22, Width = 340, Text = "실시간 전사: 꺼짐 · 로컬 녹음만" };
+    private readonly Label _livePartial = new() { Height = 24, Width = 340, Text = "말하는 중: —" };
     private readonly Button _analyze = new() { Text = "전사문에서 이동 지시 찾기", Width = 340 };
     private readonly Button _suggest = new() { Text = "'왼쪽 세 번째' 후보 찾기", Width = 340 };
     private readonly Button _pick = new() { Text = "도면에서 대상 직접 선택", Width = 340 };
@@ -29,6 +33,10 @@ internal sealed class ReviewPanel : UserControl
     private readonly RecordingTagPanel _tagReview = new();
     private string? _sessionApiKey;
     private string? _selectedAudioPath;
+    private RealtimeTranscriptionClient? _liveClient;
+    private Action<byte[]>? _livePcmHandler;
+    private string? _liveDrawing;
+    private bool _stoppingRecording;
     private readonly Panel _statusPanel = new() { Dock = DockStyle.Fill, BackColor = PaletteTheme.Status };
 
     public ReviewPanel()
@@ -68,8 +76,11 @@ internal sealed class ReviewPanel : UserControl
         var row = new FlowLayoutPanel { Width = 340, Height = 39, WrapContents = false, BackColor = PaletteTheme.Surface, Margin = Padding.Empty };
         row.Controls.Add(_record);
         row.Controls.Add(_stop);
+        var liveRow = new FlowLayoutPanel { Width = 340, Height = 39, WrapContents = false, BackColor = PaletteTheme.Surface, Margin = Padding.Empty };
+        liveRow.Controls.Add(_liveStart);
+        liveRow.Controls.Add(_liveStop);
         var cardInput = CreateCard("01  회의 입력", "녹음은 로컬 저장 · 전사는 별도 동의 후 전송", row, _chooseAudio, _recordingInfo,
-            _keyState, _setApiKey, _transcribe,
+            _keyState, _setApiKey, liveRow, _liveState, _livePartial, _transcribe,
             new Label { Text = "전사문  |  직접 수정·입력 가능", Height = 21 }, _transcript);
         var cardTags = CreateCard("02  녹음 객체 태그", "녹음 중 직접 찍기 · 전사 후 언급 검토/수정", _tagReview);
         var cardParse = CreateCard("03  변경 지시 확인", "이동량을 읽고, 불명확한 대상은 보류합니다.", _analyze, _summary);
@@ -88,6 +99,8 @@ internal sealed class ReviewPanel : UserControl
                     child.Width = innerWidth;
                 _record.Width = (innerWidth - 8) / 2;
                 _stop.Width = (innerWidth - 8) / 2;
+                _liveStart.Width = (innerWidth - 8) / 2;
+                _liveStop.Width = (innerWidth - 8) / 2;
             }
         };
         shell.Controls.Add(header, 0, 0);
@@ -95,9 +108,9 @@ internal sealed class ReviewPanel : UserControl
         shell.Controls.Add(layout, 0, 2);
         Controls.Add(shell);
 
-        foreach (var button in new[] { _record, _stop, _chooseAudio, _setApiKey, _transcribe, _analyze, _suggest, _pick, _approve, _execute })
+        foreach (var button in new[] { _record, _stop, _chooseAudio, _setApiKey, _liveStart, _liveStop, _transcribe, _analyze, _suggest, _pick, _approve, _execute })
             PaletteTheme.Button(button, primary: button == _analyze || button == _pick, caution: button == _execute);
-        foreach (var label in new[] { _keyState, _recordingInfo, _summary, _target }) PaletteTheme.Label(label);
+        foreach (var label in new[] { _keyState, _recordingInfo, _liveState, _livePartial, _summary, _target }) PaletteTheme.Label(label);
         _summary.ForeColor = PaletteTheme.Text;
         _target.ForeColor = PaletteTheme.Text;
         _transcript.BackColor = PaletteTheme.Input;
@@ -109,9 +122,15 @@ internal sealed class ReviewPanel : UserControl
 
         _record.Click += (_, _) => StartRecording();
         _stop.Click += async (_, _) => await StopRecordingAsync();
+        _recorder.RecordingEnded += () =>
+        {
+            if (!IsDisposed && IsHandleCreated) BeginInvoke(async () => await StopRecordingAsync());
+        };
         _chooseAudio.Click += (_, _) => ChooseAudio();
         _setApiKey.Click += (_, _) => PromptForApiKey();
         _transcribe.Click += async (_, _) => await TranscribeAsync();
+        _liveStart.Click += async (_, _) => await StartLiveAsync();
+        _liveStop.Click += async (_, _) => await StopLiveAsync();
         _analyze.Click += (_, _) => Analyze();
         _suggest.Click += (_, _) => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_SUGGEST ", true, false, false);
         _pick.Click += (_, _) => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_PICK ", true, false, false);
@@ -185,22 +204,129 @@ internal sealed class ReviewPanel : UserControl
             _stop.Enabled = true;
             _chooseAudio.Enabled = false;
             _transcribe.Enabled = false;
-            SetStatus("녹음 중. 로컬 파일에만 저장하며 약 5분/10MB가 상한입니다.");
+            _liveStart.Enabled = true;
+            SetStatus("녹음 중. 로컬 파일은 약 3분/10MB가 상한입니다. 실시간 전사는 별도 동의가 필요합니다.");
         }
         catch (System.Exception ex) { SetStatus("녹음 시작 실패: " + ex.Message); }
     }
 
     private async Task StopRecordingAsync()
     {
+        if (_stoppingRecording || !_stop.Enabled) return;
+        _stoppingRecording = true;
         try
         {
             var path = await _recorder.StopAsync();
+            await StopLiveAsync();
             SetSelectedAudio(path);
             _tagReview.Finish(path);
             SetStatus("녹음 저장 완료. 전사하려면 API 키와 외부 전송 동의가 필요합니다.");
         }
         catch (System.Exception ex) { SetStatus("녹음 중지 실패: " + ex.Message); }
-        finally { _record.Enabled = true; _stop.Enabled = false; _chooseAudio.Enabled = true; _transcribe.Enabled = true; }
+        finally { _record.Enabled = true; _stop.Enabled = false; _liveStart.Enabled = false; _chooseAudio.Enabled = true; _transcribe.Enabled = true; _stoppingRecording = false; }
+    }
+
+    private async Task StartLiveAsync()
+    {
+        if (!_recorder.IsRecording || _liveClient is not null) return;
+        if (string.IsNullOrWhiteSpace(_sessionApiKey) && !OpenAiTranscriber.HasEnvironmentKey && !PromptForApiKey()) return;
+        if (!ConfirmLiveUpload()) { SetStatus("실시간 전사 취소 · 로컬 녹음은 계속됩니다."); return; }
+        var key = _sessionApiKey ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        var client = new RealtimeTranscriptionClient();
+        _liveStart.Enabled = false;
+        _liveState.Text = "실시간 전사: 연결 중…";
+        client.Partial += delta =>
+        {
+            if (!IsDisposed) BeginInvoke(() => _livePartial.Text = "말하는 중: " + delta);
+        };
+        client.Completed += turn =>
+        {
+            if (IsDisposed) return;
+            BeginInvoke(() =>
+            {
+                _livePartial.Text = "말하는 중: —";
+                _transcript.AppendText((string.IsNullOrWhiteSpace(_transcript.Text) ? "" : Environment.NewLine) + turn.Text);
+                try
+                {
+                    var doc = AcadApp.DocumentManager.MdiActiveDocument;
+                    var candidates = doc is not null && doc.Name == _liveDrawing
+                        ? PluginCommands.GetDrawingCandidates() : [];
+                    _tagReview.AddRealtimeTurn(turn, _liveDrawing ?? "도면 미지정", candidates);
+                }
+                catch (System.Exception ex) { SetStatus("실시간 태그 처리 실패: " + ex.Message); }
+            });
+        };
+        client.Failed += error =>
+        {
+            if (!IsDisposed) BeginInvoke(() => { _liveState.Text = "실시간 전사: 연결 오류 · 로컬 녹음만"; SetStatus(error); });
+        };
+        try
+        {
+            await client.StartAsync(key!);
+            if (!_recorder.IsRecording)
+            {
+                await client.StopAsync();
+                await client.DisposeAsync();
+                return;
+            }
+            _liveDrawing = AcadApp.DocumentManager.MdiActiveDocument?.Name;
+            _liveClient = client;
+            _livePcmHandler = pcm => client.QueuePcm(pcm);
+            _recorder.PcmAvailable += _livePcmHandler;
+            _liveStop.Enabled = true;
+            _liveState.Text = "실시간 전사: 전송 중 · 4초마다 문장 확정";
+            SetStatus("동의한 현재 녹음의 음성만 OpenAI 실시간 전사로 보내고 있습니다.");
+        }
+        catch (System.Exception ex)
+        {
+            await client.DisposeAsync();
+            _liveStart.Enabled = _recorder.IsRecording;
+            _liveState.Text = "실시간 전사: 연결 실패 · 로컬 녹음만";
+            SetStatus(ex.Message.Contains("429", StringComparison.Ordinal)
+                ? "실시간 전사 연결 실패: HTTP 429 · OpenAI API 결제·한도·모델 사용 권한을 확인하세요. 로컬 녹음은 계속됩니다."
+                : "실시간 전사 연결 실패. 네트워크·API 키·모델 사용 권한을 확인하세요. 로컬 녹음은 계속됩니다.");
+        }
+    }
+
+    private async Task StopLiveAsync()
+    {
+        var client = _liveClient;
+        if (client is null) return;
+        _liveClient = null;
+        if (_livePcmHandler is not null) _recorder.PcmAvailable -= _livePcmHandler;
+        _livePcmHandler = null;
+        _liveStop.Enabled = false;
+        try { await client.StopAsync(); }
+        catch (System.Exception ex) { SetStatus("실시간 전사 종료 오류: " + ex.Message); }
+        finally
+        {
+            await client.DisposeAsync();
+            _liveStart.Enabled = _recorder.IsRecording;
+            _liveState.Text = "실시간 전사: 꺼짐 · 로컬 녹음만";
+        }
+    }
+
+    private static bool ConfirmLiveUpload()
+    {
+        using var dialog = new Form
+        {
+            Text = "실시간 음성 외부 전송 동의", Width = 490, Height = 225,
+            FormBorderStyle = FormBorderStyle.FixedDialog, StartPosition = FormStartPosition.CenterScreen,
+            MaximizeBox = false, MinimizeBox = false
+        };
+        var explanation = new Label
+        {
+            Left = 16, Top = 12, Width = 445, Height = 84,
+            Text = "실시간 전사를 시작하면 지금부터 중지할 때까지의 마이크 음성 조각이 OpenAI로 전송됩니다. 고객 회의·개인정보가 포함된 음성은 필요한 권한을 확인한 뒤에만 시작하세요. 도면 데이터는 보내지 않습니다."
+        };
+        var consent = new CheckBox { Left = 16, Top = 103, Width = 440, Text = "현재 녹음의 외부 음성 전송에 동의합니다", Checked = false };
+        var accept = new Button { Left = 270, Top = 138, Width = 92, Text = "동의하고 시작", Enabled = false, DialogResult = DialogResult.OK };
+        var cancel = new Button { Left = 370, Top = 138, Width = 86, Text = "취소", DialogResult = DialogResult.Cancel };
+        consent.CheckedChanged += (_, _) => accept.Enabled = consent.Checked;
+        dialog.Controls.AddRange([explanation, consent, accept, cancel]);
+        dialog.AcceptButton = accept;
+        dialog.CancelButton = cancel;
+        return dialog.ShowDialog() == DialogResult.OK && consent.Checked;
     }
 
     private async Task TranscribeAsync()
@@ -395,6 +521,8 @@ internal sealed class ReviewPanel : UserControl
     {
         if (disposing)
         {
+            if (_livePcmHandler is not null) _recorder.PcmAvailable -= _livePcmHandler;
+            _liveClient?.DisposeAsync().AsTask().GetAwaiter().GetResult();
             _recorder.Dispose();
             _tooltips.Dispose();
             _sessionApiKey = null;

@@ -46,7 +46,8 @@ internal static class OpenAiTranscriber
         try
         {
             using var json = JsonDocument.Parse(body);
-            if (json.RootElement.TryGetProperty("error", out var error) &&
+            if (json.RootElement.ValueKind == JsonValueKind.Object &&
+                json.RootElement.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.Object &&
                 error.TryGetProperty("code", out var value) && value.ValueKind == JsonValueKind.String)
                 code = value.GetString();
         }

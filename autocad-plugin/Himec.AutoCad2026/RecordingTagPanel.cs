@@ -144,6 +144,14 @@ internal sealed class RecordingTagPanel : UserControl
         return SaveAndRefresh($"객체 언급 {added}개를 찾았습니다. 단일 식별자만 검토 전 제안으로 연결했습니다.");
     }
 
+    public bool AddRealtimeTurn(CompletedTranscriptTurn turn, string drawing,
+        IReadOnlyList<RecordingObjectCandidate> candidates)
+    {
+        if (_session is null) return false;
+        var added = RealtimeTagging.AddCompletedTurn(_session, turn, drawing, candidates);
+        return SaveAndRefresh($"실시간 확정 문장에서 객체 언급 {added.Count}개를 찾았습니다. 자동 연결은 확인 후 확정하세요.");
+    }
+
     private void ShowSelected()
     {
         var id = SelectedId();

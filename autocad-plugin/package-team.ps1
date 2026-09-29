@@ -11,9 +11,10 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $bundle = Join-Path $root "dist/$Version/Himec.ChangeLoop.bundle"
 $readme = Join-Path $root 'README_INSTALL_KO.md'
+$liveReadme = Join-Path $root 'README_LIVE_PREVIEW_KO.md'
 $installer = Join-Path $root 'install-user.ps1'
 $zipPath = Join-Path $root "dist/Himec.ChangeLoop-AutoCAD2026-v$Version-team.zip"
-foreach ($path in @($bundle, $readme, $installer)) {
+foreach ($path in @($bundle, $readme, $liveReadme, $installer)) {
     if (-not (Test-Path -LiteralPath $path)) { throw "Missing package input: $path" }
 }
 if (Test-Path -LiteralPath $zipPath) { throw "Output already exists: $zipPath" }
@@ -21,6 +22,7 @@ if (Test-Path -LiteralPath $zipPath) { throw "Output already exists: $zipPath" }
 $zip = [IO.Compression.ZipFile]::Open($zipPath, [IO.Compression.ZipArchiveMode]::Create)
 try {
     [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $readme, 'README_INSTALL_KO.md') | Out-Null
+    [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $liveReadme, 'README_LIVE_PREVIEW_KO.md') | Out-Null
     [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $installer, 'install-user.ps1') | Out-Null
     $bundleFull = [IO.Path]::GetFullPath($bundle).TrimEnd('\')
     foreach ($file in Get-ChildItem -LiteralPath $bundle -File -Recurse) {
@@ -35,7 +37,7 @@ $check = [IO.Compression.ZipFile]::OpenRead($zipPath)
 try {
     $entries = @($check.Entries | ForEach-Object FullName)
     $required = @(
-        'README_INSTALL_KO.md', 'install-user.ps1',
+        'README_INSTALL_KO.md', 'README_LIVE_PREVIEW_KO.md', 'install-user.ps1',
         'Himec.ChangeLoop.bundle/PackageContents.xml',
         'Himec.ChangeLoop.bundle/Contents/Windows/Himec.AutoCad2026.dll',
         'Himec.ChangeLoop.bundle/Contents/Windows/Himec.ChangeCore.dll',
@@ -46,7 +48,7 @@ try {
     foreach ($entry in $required) {
         if ($entries -notcontains $entry) { throw "Missing ZIP entry: $entry" }
     }
-    if ($entries.Count -ne 12) { throw "Unexpected ZIP file count: $($entries.Count)" }
+    if ($entries.Count -ne 13) { throw "Unexpected ZIP file count: $($entries.Count)" }
 }
 finally { $check.Dispose() }
 
