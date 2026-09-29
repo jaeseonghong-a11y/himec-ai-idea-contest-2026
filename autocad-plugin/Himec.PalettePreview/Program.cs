@@ -104,6 +104,7 @@ internal static class Program
             var noLeak = (string)(describe.Invoke(null, [429, "{\"error\":{\"code\":\"secret-value\"}}"])
                 ?? throw new InvalidOperationException("No generic 429 message."));
             if (noLeak.Contains("secret-value")) throw new InvalidOperationException("Untrusted error code leaked into UI.");
+            describe.Invoke(null, [429, "{\"error\":\"malformed\"}"]);
             var candidates = new List<RecordingObjectCandidate>
             {
                 new("synthetic.dxf", "A1", new[] { "C2" }, "BlockReference", "COLUMN"),
@@ -118,6 +119,47 @@ internal static class Program
             if (!grid.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[1].Value) == "B12" &&
                     Convert.ToString(r.Cells[2].Value) == "선택 필요"))
                 throw new InvalidOperationException("Ambiguous drawing identifier was auto-linked.");
+            var liveType = type.Assembly.GetType("Himec.AutoCad2026.RealtimeTranscriptionClient")
+                ?? throw new InvalidOperationException("Realtime client not found.");
+            var endpoint = (Uri)liveType.GetField("Endpoint", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
+            if (endpoint.Query != "?intent=transcription" || endpoint.Query.Contains("model="))
+                throw new InvalidOperationException("Live transcription endpoint is not transcription-only.");
+            var sessionUpdate = (string)liveType.GetField("SessionUpdateMessage", BindingFlags.Static | BindingFlags.NonPublic)!.GetRawConstantValue()!;
+            using (var sessionJson = System.Text.Json.JsonDocument.Parse(sessionUpdate))
+            {
+                var input = sessionJson.RootElement.GetProperty("session").GetProperty("audio").GetProperty("input");
+                if (input.GetProperty("format").GetProperty("rate").GetInt32() != 24000 ||
+                    input.GetProperty("transcription").GetProperty("model").GetString() != "gpt-live-transcribe" ||
+                    input.GetProperty("turn_detection").ValueKind != System.Text.Json.JsonValueKind.Null)
+                    throw new InvalidOperationException("Live session configuration differs from the 24 kHz manual-commit contract.");
+            }
+            var live = Activator.CreateInstance(liveType, nonPublic: true)!;
+            try
+            {
+                if ((bool)liveType.GetMethod("QueuePcm")!.Invoke(live, [new byte[9600]])!)
+                    throw new InvalidOperationException("PCM was accepted before consent and session readiness.");
+                CompletedTranscriptTurn? completed = null;
+                liveType.GetEvent("Completed")!.AddEventHandler(live,
+                    new Action<CompletedTranscriptTurn>(turn => completed = turn));
+                liveType.GetMethod("HandleEvent", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(live,
+                    ["{\"type\":\"conversation.item.input_audio_transcription.completed\",\"item_id\":\"item-test\",\"transcript\":\"C2 기둥\"}"]);
+                if (completed?.Id != "item-test" || completed.Text != "C2 기둥")
+                    throw new InvalidOperationException("Completed live transcript was not parsed.");
+                tagType.GetMethod("AddRealtimeTurn")!.Invoke(tagPanel,
+                    [completed, "synthetic.dxf", candidates]);
+                var liveRow = grid.Rows.Cast<DataGridViewRow>().FirstOrDefault(r =>
+                    Convert.ToString(r.Cells[1].Value) == "C2" &&
+                    Convert.ToString(r.Cells[2].Value)!.Contains("제안 연결"));
+                if (liveRow is null) throw new InvalidOperationException("Final live turn did not create a proposed tag.");
+                grid.CurrentCell = liveRow.Cells[1];
+                tagType.GetMethod("ConfirmSelected", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(tagPanel, null);
+                if (!grid.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[2].Value) == "사용자 확정"))
+                    throw new InvalidOperationException("Proposed tag was not confirmed by the user action.");
+                ((Task)liveType.GetMethod("StopAsync")!.Invoke(live, null)!).GetAwaiter().GetResult();
+                if ((bool)liveType.GetMethod("QueuePcm")!.Invoke(live, [new byte[9600]])!)
+                    throw new InvalidOperationException("PCM was accepted after live transcription stop.");
+            }
+            finally { ((IAsyncDisposable)live).DisposeAsync().AsTask().GetAwaiter().GetResult(); }
             Console.WriteLine("Palette audio, error, transcript-tag list, object-link and local-save checks passed");
         }
         finally

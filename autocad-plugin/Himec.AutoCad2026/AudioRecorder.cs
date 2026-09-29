@@ -13,6 +13,8 @@ internal sealed class AudioRecorder : IDisposable
 
     public bool IsRecording => _input is not null;
     public string? LastFilePath { get; private set; }
+    public event Action<byte[]>? PcmAvailable;
+    public event Action? RecordingEnded;
 
     public string Start()
     {
@@ -21,7 +23,8 @@ internal sealed class AudioRecorder : IDisposable
         var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Himec", "Recordings");
         Directory.CreateDirectory(folder);
         _path = Path.Combine(folder, $"meeting-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.wav");
-        var input = new WaveInEvent { WaveFormat = new WaveFormat(16000, 16, 1), BufferMilliseconds = 200 };
+        // The same 24 kHz mono PCM is written to WAV and, only after consent, sent to live STT.
+        var input = new WaveInEvent { WaveFormat = new WaveFormat(24000, 16, 1), BufferMilliseconds = 200 };
         var writer = new WaveFileWriter(_path, input.WaveFormat);
         _stopped = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         _input = input;
@@ -29,6 +32,13 @@ internal sealed class AudioRecorder : IDisposable
         input.DataAvailable += (_, e) =>
         {
             writer.Write(e.Buffer, 0, e.BytesRecorded);
+            if (PcmAvailable is not null)
+            {
+                var copy = new byte[e.BytesRecorded];
+                Buffer.BlockCopy(e.Buffer, 0, copy, 0, e.BytesRecorded);
+                try { PcmAvailable.Invoke(copy); }
+                catch (Exception) { /* Live transport must never interrupt local WAV writing. */ }
+            }
             if (writer.Length >= MaxBytes) input.StopRecording();
         };
         input.RecordingStopped += (_, e) =>
@@ -43,6 +53,7 @@ internal sealed class AudioRecorder : IDisposable
                 LastFilePath = _path;
                 _stopped?.TrySetResult(_path!);
             }
+            RecordingEnded?.Invoke();
         };
         try { input.StartRecording(); }
         catch
