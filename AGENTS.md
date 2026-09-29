@@ -23,8 +23,8 @@
 - 목표: 제1회 HIMEC AI 활용 아이디어 공모전 출품
 - 한 줄 정의: 회의 설계 변경 지시를 구조화·주석화하고 사람이 승인한 일부 변경만 합성 CAD 도면에 반영하는 피드백 루프 — `docs/PROJECT_BRIEF.md`
 - 공모 분야: 설계·엔지니어링
-- 데모 구성: 합성 텍스트·PDF·DXF와 승인 흐름. Python 라이브러리/LLM 제공자별 연결은 실제 검증 결과만 확정
-- AutoCAD 플러그인: 이번 최소 데모 범위 밖. 실제 DWG/PDF 매핑과 AutoCAD 검증은 미완료
+- 데모 구성: AutoCAD 2026 플러그인 v0(녹음·전사 선택 호출·검토·수동 대상 지정·승인 후 블록 이동)과 기존 합성 텍스트·PDF·DXF 경로를 구분한다. 실제 검증 결과만 확정한다.
+- AutoCAD 플러그인: 사용자 요청으로 우선 구현 중. AutoCAD 2026 v0.1.2의 팔레트/수동 문장 해석과 v0.2.1의 사용자별 설치/새 UI 표시는 실제 화면으로 확인. 2024 호환, 실제 DWG/PDF 매핑, 녹음 음성 품질·외부 전사·플러그인 편집/UNDO는 별도 완료 전까지 미검증
 - 제출 규격과 평가 기준: `sources/SRC-001_OFFICIAL_CONTEST.md` 기준
 
 ## 작업 방식
@@ -39,6 +39,7 @@
 - 개인정보, 고객 자료, API 키, 토큰을 코드·문서·로그·커밋에 넣지 않는다.
 - 서명·생년월일·전화번호 등이 적힌 참가 서류는 절대 Git에 올리지 않고 `submission-private/` 또는 저장소 밖에서 관리한다.
 - C 단계 합성 DXF 단위 검증: `python -m unittest discover -s prototype/tests -v` (`ezdxf` 설치 필요). A/B/D와 연결한 전체 통합 검증 명령은 아직 미정이다.
+- 플러그인 파서 검증: `dotnet run --project autocad-plugin/Himec.ChangeCore.Tests/Himec.ChangeCore.Tests.csproj`; 호스트 빌드: `dotnet build autocad-plugin/Himec.AutoCad2026/Himec.AutoCad2026.csproj -c Release`. 실제 AutoCAD 로드·실행은 별도 스모크 테스트가 필요하다.
 - 커밋 메시지는 `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:` 중 알맞은 말머리를 사용한다.
 
 ## GitHub 팀 규칙

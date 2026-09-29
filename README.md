@@ -14,7 +14,7 @@
 
 - 공식 공고와 제출 양식 원본 확보
 - 평가 기준과 제출 체크리스트 정리
-- 아이디어·지원 분야·기술 스택은 팀 합의 필요
+- 출품 방향: 설계 변경 피드백 루프 / 설계·엔지니어링. AutoCAD 2026 플러그인 v0는 `autocad-plugin/README.md`, 기존 합성 데모는 `prototype/README.md` 참고. 각 기능의 실제 검증 상태는 `CURRENT_STATE.md`에 기록
 - 팀원 계정: `archuni`, `ehgudwns18`, `kijun-0108` 협업 권한 확인
 
 ## 작업 흐름

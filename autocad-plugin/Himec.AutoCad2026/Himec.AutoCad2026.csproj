@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <AutoCadDir Condition="'$(AutoCadDir)' == ''">C:\Program Files\Autodesk\AutoCAD 2026\</AutoCadDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Himec.ChangeCore/Himec.ChangeCore.csproj" />
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <Reference Include="AcMgd"><HintPath>$(AutoCadDir)AcMgd.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="AcDbMgd"><HintPath>$(AutoCadDir)AcDbMgd.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="AcCoreMgd"><HintPath>$(AutoCadDir)AcCoreMgd.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

@@ -8,6 +8,7 @@
 | SRC-002 | 붙임 1~4 제출서류 | 주최사 공식 | `official/SRC-002_submission_forms.docx`, `.hwp` | 2026-09-29 | 원본 확보·DOCX 필드 추출 |
 | SRC-003 | 하이멕 업무·산업 맥락 | 주최사 공식 웹 | `SRC-003_HIMEC_CONTEXT.md`의 링크 | 2026-09-29 | 페이지별 확인 |
 | SRC-004 | 건축설비엔지니어링 DX 구축 사례 및 AI 전략 | 하이멕 저자 학술발표 논문 | `official/SRC-004_HIMEC_DX_AI_strategy.pdf`, [게시물](https://www.himec.co.kr/ko/info/technical/?gbn=viewok&gp=2&ix=427) | 2026-09-29 | 원본 확보·4쪽 전체 시각 검토 |
+| SRC-005 | OpenAI 녹음 파일 전사 API 규격 | 공급자 공식 개발 문서 | [Audio API Reference](https://platform.openai.com/docs/api-reference/audio/voice-consent-object?lang=curl), `SRC-005_OPENAI_TRANSCRIPTION.md` | 2026-09-29 | 엔드포인트·WAV·모델·JSON 텍스트 필드 확인 |
 
 ## 원본 무결성
 
