@@ -26,12 +26,113 @@ public sealed class PluginCommands : IExtensionApplication
             _panel = new ReviewPanel();
             _palette = new PaletteSet("HIMEC 설계 변경", new Guid("79736E11-07A6-4D5E-8210-7EF45EF747E2"))
             {
-                Size = new System.Drawing.Size(420, 640),
-                MinimumSize = new System.Drawing.Size(360, 500)
+                Size = new System.Drawing.Size(600, 680),
+                MinimumSize = new System.Drawing.Size(300, 300)
             };
             _palette.Add("회의 변경", _panel);
         }
         _palette.Visible = true;
+    }
+
+    internal static IReadOnlyList<RecordingObjectCandidate> GetDrawingCandidates()
+    {
+        var doc = AcadApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return [];
+        using var locked = doc.LockDocument();
+        using var tr = doc.TransactionManager.StartTransaction();
+        var space = (BlockTableRecord)tr.GetObject(doc.Database.CurrentSpaceId, OpenMode.ForRead);
+        var result = new List<RecordingObjectCandidate>();
+        foreach (ObjectId id in space)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not BlockReference block) continue;
+            var identifiers = new List<string> { block.Name };
+            foreach (ObjectId attributeId in block.AttributeCollection)
+            {
+                if (tr.GetObject(attributeId, OpenMode.ForRead) is AttributeReference attribute)
+                {
+                    identifiers.Add(attribute.TextString);
+                    identifiers.Add(attribute.Tag);
+                }
+            }
+            result.Add(new RecordingObjectCandidate(doc.Name, block.Handle.ToString(), identifiers, nameof(BlockReference), block.Layer));
+        }
+        return result;
+    }
+
+    internal static string ShowSelectedObject(string drawing, string handle)
+    {
+        var doc = AcadApp.DocumentManager.MdiActiveDocument;
+        if (doc is null || !string.Equals(doc.Name, drawing, StringComparison.OrdinalIgnoreCase))
+            return "태그가 연결된 도면을 먼저 열어 주세요.";
+        using var locked = doc.LockDocument();
+        using var tr = doc.TransactionManager.StartTransaction();
+        var space = (BlockTableRecord)tr.GetObject(doc.Database.CurrentSpaceId, OpenMode.ForRead);
+        foreach (ObjectId id in space)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is Entity entity &&
+                string.Equals(entity.Handle.ToString(), handle, StringComparison.OrdinalIgnoreCase))
+            {
+                doc.Editor.SetImpliedSelection(new[] { id });
+                doc.Editor.UpdateScreen();
+                return $"객체 #{handle}을 도면에서 선택 표시했습니다. 도면은 수정하지 않았습니다.";
+            }
+        }
+        return "연결된 객체를 현재 도면에서 찾지 못했습니다. 태그를 다시 지정하세요.";
+    }
+
+    internal static string TrySuggestMoveTarget(ChangeInstruction change)
+    {
+        var doc = AcadApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return "열린 도면이 없어 대상을 자동으로 찾지 못했습니다.";
+        var ids = System.Text.RegularExpressions.Regex.Matches(change.SourceText,
+                @"(?<![A-Za-z0-9])(?:[CBE]-?\d{1,4})(?![A-Za-z0-9])",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+            .Select(m => m.Value.Replace("-", "").ToUpperInvariant()).Distinct().ToArray();
+        if (ids.Length > 1) return "대상 식별자가 여러 개입니다. 도면에서 직접 선택하세요.";
+        string targetHandle;
+        string description;
+        if (ids.Length == 1)
+        {
+            var matches = GetDrawingCandidates().Where(c => c.Identifiers.Any(i =>
+                    string.Equals(i.Trim().Replace("-", ""), ids[0], StringComparison.OrdinalIgnoreCase)))
+                .ToArray();
+            if (matches.Length != 1) return $"{ids[0]} 일치 객체 {matches.Length}개 — 직접 선택하세요.";
+            targetHandle = matches[0].Handle;
+            description = ids[0];
+        }
+        else if (change.SourceText.Contains("왼쪽에서") &&
+                 (change.SourceText.Contains("세 번째") || change.SourceText.Contains("세번째") || change.SourceText.Contains("3번째")))
+        {
+            using var candidateLock = doc.LockDocument();
+            using var candidateTransaction = doc.TransactionManager.StartTransaction();
+            var currentSpace = (BlockTableRecord)candidateTransaction.GetObject(doc.Database.CurrentSpaceId, OpenMode.ForRead);
+            var columns = new List<ColumnCandidate>();
+            foreach (ObjectId id in currentSpace)
+                if (candidateTransaction.GetObject(id, OpenMode.ForRead) is BlockReference block &&
+                    ColumnTargeting.IsColumnLabel(block.Name, block.Layer))
+                    columns.Add(new ColumnCandidate(block.Handle.ToString(), block.Name, block.Position.X, block.Position.Y));
+            if (!ColumnTargeting.TryThirdFromLeft(columns, out var selected, out var reason)) return reason;
+            targetHandle = selected!.Handle;
+            description = "왼쪽 세 번째 기둥";
+        }
+        else return "대상 식별자가 명확하지 않습니다. 도면에서 직접 선택하세요.";
+        using var locked = doc.LockDocument();
+        using var tr = doc.TransactionManager.StartTransaction();
+        var space = (BlockTableRecord)tr.GetObject(doc.Database.CurrentSpaceId, OpenMode.ForRead);
+        foreach (ObjectId id in space)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not BlockReference block ||
+                !string.Equals(block.Handle.ToString(), targetHandle, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!ColumnTargeting.IsColumnLabel(block.Name, block.Layer))
+                return "식별자는 일치하지만 이동 가능한 기둥 블록이 아닙니다. 직접 확인하세요.";
+            SelectedObjectId = id;
+            change.TargetHandle = targetHandle;
+            change.TargetDrawing = doc.Name;
+            doc.Editor.SetImpliedSelection(new[] { id });
+            doc.Editor.UpdateScreen();
+            return $"{description} · 단일 기둥 블록 #{targetHandle} 제안 선택 — 도면 강조를 확인하고 승인하세요.";
+        }
+        return "일치 객체를 다시 찾지 못했습니다. 도면에서 직접 선택하세요.";
     }
 
     [CommandMethod("HIMEC_TAG_PICK")]

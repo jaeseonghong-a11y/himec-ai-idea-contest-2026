@@ -14,6 +14,8 @@ internal sealed class RecordingTagPanel : UserControl
     private readonly Button _scan = new() { Text = "전사문에서 객체 찾기" };
     private readonly Button _unlink = new() { Text = "객체 연결 해제" };
     private readonly Button _remove = new() { Text = "선택 태그 삭제" };
+    private readonly Button _show = new() { Text = "선택된 객체 확인" };
+    private readonly Button _confirm = new() { Text = "제안 연결 확정" };
     private readonly Label _count = new() { Height = 23, ForeColor = PaletteTheme.Muted };
     private RecordingTagSession? _session;
     private bool _isRecording;
@@ -26,15 +28,16 @@ internal sealed class RecordingTagPanel : UserControl
 
     public RecordingTagPanel()
     {
-        Height = 328;
+        Height = 367;
         Width = 340;
         BackColor = PaletteTheme.Surface;
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 6, Margin = Padding.Empty, Padding = Padding.Empty };
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 7, Margin = Padding.Empty, Padding = Padding.Empty };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 135));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 39));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 39));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 39));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 39));
@@ -77,6 +80,9 @@ internal sealed class RecordingTagPanel : UserControl
         AddButton(layout, _scan, 0, 4, () => ScanRequested?.Invoke());
         AddButton(layout, _unlink, 1, 4, UnlinkSelected);
         AddButton(layout, _remove, 0, 5, RemoveSelected);
+        AddButton(layout, _show, 1, 5, ShowSelected);
+        AddButton(layout, _confirm, 0, 6, ConfirmSelected);
+        layout.SetColumnSpan(_confirm, 2);
         Controls.Add(layout);
     }
 
@@ -119,6 +125,45 @@ internal sealed class RecordingTagPanel : UserControl
         if (_session is null) { StatusChanged?.Invoke("먼저 녹음 파일을 선택하세요."); return false; }
         var added = _session.AddTranscriptMentions(transcript);
         return SaveAndRefresh($"전사문에서 객체 언급 {added}개를 추가했습니다. 미지정 항목은 도면에서 확인하세요.");
+    }
+
+    public bool AddTranscriptWithCandidates(string transcript, string drawing,
+        IReadOnlyList<RecordingObjectCandidate> candidates)
+    {
+        if (_session is null) { StatusChanged?.Invoke("먼저 녹음 파일을 선택하세요."); return false; }
+        var added = 0;
+        foreach (var sentence in System.Text.RegularExpressions.Regex.Split(transcript, @"[.!?\r\n]+"))
+        {
+            if (string.IsNullOrWhiteSpace(sentence)) continue;
+            var id = "file-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(sentence.Trim())));
+            var tags = RealtimeTagging.AddCompletedTurn(_session,
+                new CompletedTranscriptTurn(id, sentence.Trim(), 0), drawing, candidates);
+            added += tags.Count;
+        }
+        return SaveAndRefresh($"객체 언급 {added}개를 찾았습니다. 단일 식별자만 검토 전 제안으로 연결했습니다.");
+    }
+
+    private void ShowSelected()
+    {
+        var id = SelectedId();
+        if (id is null || _session is null) { StatusChanged?.Invoke("목록에서 태그를 먼저 선택하세요."); return; }
+        var tag = _session.Find(id);
+        StatusChanged?.Invoke(!tag.IsLinked
+            ? "이 태그는 아직 객체가 지정되지 않았습니다. 도면에서 직접 선택하세요."
+            : PluginCommands.ShowSelectedObject(tag.Drawing!, tag.Handle!));
+    }
+
+    private void ConfirmSelected()
+    {
+        var id = SelectedId();
+        if (id is null || _session is null) { StatusChanged?.Invoke("목록에서 태그를 먼저 선택하세요."); return; }
+        try
+        {
+            _session.Confirm(id, DateTimeOffset.Now);
+            SaveAndRefresh("이 객체 연결을 사용자가 확정했습니다. 도면은 수정하지 않았습니다.");
+        }
+        catch (Exception ex) { StatusChanged?.Invoke("연결 확정 실패: " + ex.Message); }
     }
 
     private void AddManual()
@@ -217,14 +262,20 @@ internal sealed class RecordingTagPanel : UserControl
         foreach (var tag in _session?.Tags ?? [])
         {
             var time = tag.OffsetSeconds is double seconds ? TimeSpan.FromSeconds(seconds).ToString(@"mm\:ss") : "—";
-            var row = _grid.Rows[_grid.Rows.Add(time, tag.Label, tag.IsLinked ? "지정 완료" : "미지정",
+            var state = tag.EffectiveSuggestionStatus switch
+            {
+                RecordingTagSuggestionStatus.Proposed => "제안 연결 · 확인 필요",
+                RecordingTagSuggestionStatus.Confirmed => "사용자 확정",
+                _ => tag.IsLinked ? "지정 완료" : "선택 필요"
+            };
+            var row = _grid.Rows[_grid.Rows.Add(time, tag.Label, state,
                 tag.IsLinked ? $"{Path.GetFileName(tag.Drawing)} #{tag.Handle} · {tag.Layer}" : tag.SourceQuote)];
             row.Tag = tag.Id;
             row.Cells[3].ToolTipText = tag.IsLinked ? $"{tag.Drawing}\n{tag.EntityType} / {tag.Layer}" : tag.SourceQuote;
         }
         var total = _session?.Tags.Count ?? 0;
         var linked = _session?.Tags.Count(t => t.IsLinked) ?? 0;
-        _count.Text = $"태그 {total}개 · 지정 완료 {linked}개 · 미지정 {total - linked}개";
+        _count.Text = $"태그 {total}개 · 연결 {linked}개 · 선택 필요 {total - linked}개";
         _grid.ClearSelection();
         _grid.CurrentCell = null;
     }

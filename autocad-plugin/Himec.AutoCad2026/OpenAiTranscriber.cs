@@ -30,7 +30,7 @@ internal static class OpenAiTranscriber
         using var response = await Client.SendAsync(request).ConfigureAwait(false);
         var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"전사 API 오류: HTTP {(int)response.StatusCode}. 키·사용량·파일 형식을 확인하세요.");
+            throw new InvalidOperationException(DescribeError((int)response.StatusCode, body));
         using var json = JsonDocument.Parse(body);
         if (!json.RootElement.TryGetProperty("text", out var text))
             throw new InvalidOperationException("전사 API 응답에 text가 없습니다.");
@@ -38,5 +38,33 @@ internal static class OpenAiTranscriber
         if (string.IsNullOrWhiteSpace(transcript))
             throw new InvalidOperationException("전사 결과가 비어 있습니다. 녹음 장치와 음성을 확인한 뒤 다시 시도하세요.");
         return transcript;
+    }
+
+    internal static string DescribeError(int status, string body)
+    {
+        string? code = null;
+        try
+        {
+            using var json = JsonDocument.Parse(body);
+            if (json.RootElement.TryGetProperty("error", out var error) &&
+                error.TryGetProperty("code", out var value) && value.ValueKind == JsonValueKind.String)
+                code = value.GetString();
+        }
+        catch (JsonException) { /* Never show untrusted response text or a secret in the UI. */ }
+        var explanation = code switch
+        {
+            "credit_balance_exhausted" or "insufficient_quota" => "API 잔액/할당량을 확인하세요. ChatGPT 구독과 API 결제는 별도입니다.",
+            "project_spend_limit_exceeded" => "이 API 키가 속한 프로젝트의 지출 한도를 확인하세요.",
+            "organization_spend_limit_exceeded" or "organization_usage_limit_exceeded" => "API 조직의 사용·지출 한도를 확인하세요.",
+            "invalid_api_key" => "API 키가 유효하지 않습니다. 팔레트에서 OpenAI API 키를 다시 입력하세요.",
+            _ when status == 429 => "요청 속도 제한 또는 API 잔액·사용 한도 문제입니다. OpenAI API 결제/한도 페이지를 확인하세요.",
+            _ when status == 401 => "OpenAI API 키가 유효하지 않습니다. 키를 다시 입력하세요.",
+            _ when status == 413 => "녹음 파일 크기 제한입니다. 더 짧게 녹음하세요.",
+            _ => "계정 상태·파일 형식·네트워크를 확인하세요."
+        };
+        var safeCode = code is "credit_balance_exhausted" or "insufficient_quota" or
+            "project_spend_limit_exceeded" or "organization_spend_limit_exceeded" or
+            "organization_usage_limit_exceeded" or "invalid_api_key" ? $" ({code})" : "";
+        return $"전사 API 오류: HTTP {status}{safeCode}. {explanation} 녹음 파일은 로컬에 남아 있습니다.";
     }
 }
