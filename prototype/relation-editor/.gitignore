@@ -1,7 +1,13 @@
-# 실제 도면과 거기서 나온 결과물은 저장소에 올리지 않는다 (따로 공유)
+# 원본 도면과 실행 결과물은 올리지 않는다.
+# real_dxf/ 에는 사무소·대지 위치·사람 정보를 가린 1~4층 평면도 복사본(A12~A15)만 올린다 (tools/mask_dxf.py 로 만든 것)
 real sample/
-real_dxf/
 real_pdf/
+masked_dxf/
+real_dxf/*
+!real_dxf/A12.dxf
+!real_dxf/A13.dxf
+!real_dxf/A14.dxf
+!real_dxf/A15.dxf
 out/
 changes_*.json
 __pycache__/
