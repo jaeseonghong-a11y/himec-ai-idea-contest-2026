@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApplicationPackage SchemaVersion="1.0"
+                    AppVersion="0.1.0.0"
+                    ProductCode="{D08BFDA0-B590-4A7E-B9D7-2407A5382799}"
+                    UpgradeCode="{2FC2AFC0-7796-4D36-B33A-51460D665BF2}"
+                    Name="HIMEC Change Loop"
+                    Description="Reviewed drawing change demo for AutoCAD 2026">
+  <Components>
+    <RuntimeRequirements OS="Win64" Platform="AutoCAD" SeriesMin="R25.1" SeriesMax="R25.1" />
+    <ComponentEntry AppName="HimecChangeLoop"
+                    AppDescription="Record, review and apply one approved block move"
+                    ModuleName="./Contents/Windows/Himec.AutoCad2026.dll"
+                    AppType=".Net"
+                    LoadReasons="LoadOnCommandInvocation">
+      <AssemblyMappings>
+        <AssemblyMappingFolder Path="./Contents/Windows" />
+      </AssemblyMappings>
+      <Commands GroupName="HIMEC_CHANGE">
+        <Command Global="HIMEC" Local="HIMEC" />
+        <Command Global="HIMEC_PICK" Local="HIMEC_PICK" />
+        <Command Global="HIMEC_SUGGEST" Local="HIMEC_SUGGEST" />
+        <Command Global="HIMEC_APPLY" Local="HIMEC_APPLY" />
+      </Commands>
+    </ComponentEntry>
+  </Components>
+</ApplicationPackage>

@@ -9,7 +9,7 @@
 | `kijun-0108` | `work/kijun-0108/r02` (생성됨) | [#17 합성 도면·대본·사이드카](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/17) | `prototype/samples/`, `prototype/sidecar/` |
 | `archuni` | `work/archuni/r02` (생성됨) | [#18 변경지시 추출·PDF 주석·승인](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/18) | `prototype/extract/`, `prototype/annotate/` |
 | `ehgudwns18` | `work/ehgudwns18/r02` (생성됨) | [#20 경량 관계 그래프](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/20) | `prototype/graph/` |
-| `jaeseonghong-a11y` | 팀장 전용 작업 브랜치 | [#19 승인된 DXF 변경 전파·검사](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/19) | `prototype/propagate/`, 통합·제출 문서 |
+| `jaeseonghong-a11y` | 팀장 전용 작업 브랜치 | [#19 합성 DXF 전파·검사](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/19), [#25 AutoCAD 플러그인 v0](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/25) | `prototype/propagate/`, `autocad-plugin/`, 통합·제출 문서 |
 
 Round 01의 조사 결과와 브랜치는 삭제하지 않는다. 아이디어 확정 전 후보 평가(`#7`, `#8`, PR `#14`)는 새 방향으로 대체되어 2026-09-29 이유를 남기고 종료했다. #9/PR #13의 구현 경로 조사는 이미 `main`에 반영했다.
 

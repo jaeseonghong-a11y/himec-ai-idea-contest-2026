@@ -26,6 +26,9 @@ tmp/
 *.log
 __pycache__/
 *.pyc
+autocad-plugin/**/bin/
+autocad-plugin/**/obj/
+autocad-plugin/dist/
 
 # Local source package; the extracted workflow kit is tracked.
 team-workflow-kit-*.zip
