@@ -1,6 +1,6 @@
 # AutoCAD 2026 실시간 전사·객체 태그 개발판
 
-이 문서는 `work/jaeseonghong-a11y/r05-live-transcription`의 개발 동작을 설명한다. 현재 공개된 `v0.3.1-preview` ZIP에는 이 기능이 없다. **AutoCAD 호스트·실제 OpenAI 계정 검증 전에는 팀 배포판으로 취급하지 않는다.**
+이 문서는 [v0.4.3-lab 실험판](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/releases/tag/v0.4.3-lab)의 개발 동작을 설명한다. 기존 `v0.3.1-preview` ZIP에는 이 기능이 없다. **AutoCAD 호스트·실제 OpenAI 계정 검증 전에는 완성판으로 취급하지 않는다.**
 
 ## 사용 흐름
 
