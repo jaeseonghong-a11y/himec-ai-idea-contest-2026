@@ -17,6 +17,7 @@
       </AssemblyMappings>
       <Commands GroupName="HIMEC_CHANGE">
         <Command Global="HIMEC" Local="HIMEC" />
+        <Command Global="HIMEC_TAG_PICK" Local="HIMEC_TAG_PICK" />
         <Command Global="HIMEC_PICK" Local="HIMEC_PICK" />
         <Command Global="HIMEC_SUGGEST" Local="HIMEC_SUGGEST" />
         <Command Global="HIMEC_APPLY" Local="HIMEC_APPLY" />

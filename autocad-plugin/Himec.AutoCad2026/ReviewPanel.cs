@@ -26,6 +26,7 @@ internal sealed class ReviewPanel : UserControl
     private readonly Button _pick = new() { Text = "도면에서 대상 직접 선택", Width = 340 };
     private readonly Button _approve = new() { Text = "지시 승인", Width = 340 };
     private readonly Button _execute = new() { Text = "승인된 변경 실행", Width = 340 };
+    private readonly RecordingTagPanel _tagReview = new();
     private string? _sessionApiKey;
     private string? _selectedAudioPath;
     private readonly Panel _statusPanel = new() { Dock = DockStyle.Fill, BackColor = PaletteTheme.Status };
@@ -46,7 +47,7 @@ internal sealed class ReviewPanel : UserControl
         header.Controls.Add(new Label
         {
             Dock = DockStyle.Bottom, Height = 20, ForeColor = PaletteTheme.Muted,
-            Text = "녹음 → 변경 해석 → 대상 확인 → 승인 실행", Font = new Font("Segoe UI", 8.5F)
+            Text = "녹음 → 객체 태그 → 변경 해석 → 승인 실행", Font = new Font("Segoe UI", 8.5F)
         });
         header.Controls.Add(new Label
         {
@@ -70,10 +71,11 @@ internal sealed class ReviewPanel : UserControl
         var cardInput = CreateCard("01  회의 입력", "녹음은 로컬 저장 · 전사는 별도 동의 후 전송", row, _chooseAudio, _recordingInfo,
             _keyState, _setApiKey, _transcribe,
             new Label { Text = "전사문  |  직접 수정·입력 가능", Height = 21 }, _transcript);
-        var cardParse = CreateCard("02  변경 지시 확인", "이동량을 읽고, 불명확한 대상은 보류합니다.", _analyze, _summary);
-        var cardTarget = CreateCard("03  도면 대상 지정", "후보는 참고용 · 최종 대상은 직접 클릭", _suggest, _pick, _target);
-        var cardApply = CreateCard("04  검토 후 반영", "승인 전에는 도면을 수정하지 않습니다.", _approve, _execute);
-        var cards = new[] { cardInput, cardParse, cardTarget, cardApply };
+        var cardTags = CreateCard("02  녹음 객체 태그", "녹음 중 직접 찍기 · 전사 후 언급 검토/수정", _tagReview);
+        var cardParse = CreateCard("03  변경 지시 확인", "이동량을 읽고, 불명확한 대상은 보류합니다.", _analyze, _summary);
+        var cardTarget = CreateCard("04  도면 대상 지정", "후보는 참고용 · 최종 대상은 직접 클릭", _suggest, _pick, _target);
+        var cardApply = CreateCard("05  검토 후 반영", "승인 전에는 도면을 수정하지 않습니다.", _approve, _execute);
+        var cards = new[] { cardInput, cardTags, cardParse, cardTarget, cardApply };
         foreach (var card in cards) layout.Controls.Add(card);
         layout.SizeChanged += (_, _) =>
         {
@@ -115,6 +117,9 @@ internal sealed class ReviewPanel : UserControl
         _pick.Click += (_, _) => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_PICK ", true, false, false);
         _approve.Click += (_, _) => Approve();
         _execute.Click += (_, _) => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_APPLY ", true, false, false);
+        _tagReview.StatusChanged += SetStatus;
+        _tagReview.ScanRequested += () => { _tagReview.AddTranscriptMentions(_transcript.Text); };
+        _tagReview.PickRequested += () => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_TAG_PICK ", true, false, false);
     }
 
     public void SetStatus(string text)
@@ -172,11 +177,14 @@ internal sealed class ReviewPanel : UserControl
     {
         try
         {
-            _recorder.Start();
+            var path = _recorder.Start();
+            _tagReview.Start(path);
             _selectedAudioPath = null;
             _recordingInfo.Text = "녹음 중… 중지 후 파일을 확인하세요.";
             _record.Enabled = false;
             _stop.Enabled = true;
+            _chooseAudio.Enabled = false;
+            _transcribe.Enabled = false;
             SetStatus("녹음 중. 로컬 파일에만 저장하며 약 5분/10MB가 상한입니다.");
         }
         catch (System.Exception ex) { SetStatus("녹음 시작 실패: " + ex.Message); }
@@ -188,10 +196,11 @@ internal sealed class ReviewPanel : UserControl
         {
             var path = await _recorder.StopAsync();
             SetSelectedAudio(path);
+            _tagReview.Finish(path);
             SetStatus("녹음 저장 완료. 전사하려면 API 키와 외부 전송 동의가 필요합니다.");
         }
         catch (System.Exception ex) { SetStatus("녹음 중지 실패: " + ex.Message); }
-        finally { _record.Enabled = true; _stop.Enabled = false; }
+        finally { _record.Enabled = true; _stop.Enabled = false; _chooseAudio.Enabled = true; _transcribe.Enabled = true; }
     }
 
     private async Task TranscribeAsync()
@@ -210,7 +219,10 @@ internal sealed class ReviewPanel : UserControl
         {
             SetStatus("전사 중…");
             _transcript.Text = await OpenAiTranscriber.TranscribeAsync(path, _sessionApiKey);
-            SetStatus("전사 완료. 원문을 확인하고 이동 지시 찾기를 누르세요.");
+            var tagsSaved = _tagReview.AddTranscriptMentions(_transcript.Text);
+            SetStatus(tagsSaved
+                ? "전사 완료. 객체 언급 목록과 원문을 확인하세요."
+                : "전사 완료, 태그 저장 실패. 상단 오류와 로컬 저장 경로를 확인하세요.");
         }
         catch (System.Exception ex)
         {
@@ -251,9 +263,17 @@ internal sealed class ReviewPanel : UserControl
         using var reader = new WaveFileReader(path);
         if (reader.TotalTime.TotalSeconds <= 0)
             throw new InvalidOperationException("WAV 파일 길이가 0초입니다.");
+        _tagReview.SelectAudio(path);
         _selectedAudioPath = path;
         _recordingInfo.Text = $"선택 녹음: {reader.TotalTime.TotalSeconds:0.0}초 · {size / 1024.0:0}KB";
         _tooltips.SetToolTip(_recordingInfo, path);
+    }
+
+    public void TagPicked(string drawing, string handle, string entityType, string layer)
+    {
+        if (IsDisposed) return;
+        if (InvokeRequired) BeginInvoke(() => _tagReview.CompletePick(drawing, handle, entityType, layer));
+        else _tagReview.CompletePick(drawing, handle, entityType, layer);
     }
 
     private bool PromptForApiKey()

@@ -11,6 +11,8 @@ AutoCAD 내부 `HIMEC` 명령으로 열리는 팔레트의 첫 구현이다. 현
 5. `도면에서 대상 직접 선택`: AutoCAD에서 기둥 블록 하나를 클릭해 확정한다. DXF를 도면에 통째로 `삽입`한 외부 블록은 대상이 아니다. 시험 DXF는 `열기`로 연다.
 6. `지시 승인` 다음 `승인된 변경 실행`: 현재 도면의 `INSUNITS=4`(mm), 대상 핸들, 승인 로그를 재검증한 뒤 WCS X/Y 기준으로 블록 한 건을 이동한다. 자동 저장하지 않으며 AutoCAD의 `UNDO`로 되돌릴 수 있다.
 
+개발 중인 v0.3.1 태그 흐름은 녹음 중 객체를 직접 클릭해 시각·핸들을 남기고, 녹음 후 전사문 언급을 목록에 올려 수정·추가·삭제·재지정하는 기능이다. **녹음 중 음성의 자동 인식/자동 객체 매칭은 아직 아니다.** [태그 기능의 정확한 범위와 검증 경계](../docs/AUTOCAD_RECORDING_TAGS.md)를 확인한다.
+
 승인/실행 기록은 `%LOCALAPPDATA%\Himec\Changes`에 저장한다. 사용자 데이터가 Git에 올라가지 않는다. 녹음은 사전에 참여자 동의를 받아야 한다.
 
 ## 빌드
@@ -20,18 +22,18 @@ AutoCAD 2026이 설치된 Windows와 .NET 8 SDK가 필요하다. AutoCAD 관리 
 ```powershell
 dotnet run --project autocad-plugin/Himec.ChangeCore.Tests/Himec.ChangeCore.Tests.csproj
 dotnet build autocad-plugin/Himec.AutoCad2026/Himec.AutoCad2026.csproj -c Release
-./autocad-plugin/package.ps1 -Version 0.2.1
+./autocad-plugin/package.ps1 -Version 0.3.1
 ```
 
-`package.ps1`은 기존 버전을 덮어쓰지 않는다. 예시는 `dist/0.2.1/Himec.ChangeLoop.bundle`을 만든다. 빌드 결과에 Autodesk DLL은 포함하지 않고 NAudio 및 프로젝트 DLL만 포함한다.
+`package.ps1`은 기존 버전을 덮어쓰지 않는다. 예시는 `dist/0.3.1/Himec.ChangeLoop.bundle`을 만든다. 빌드 결과에 Autodesk DLL은 포함하지 않고 NAudio 및 프로젝트 DLL만 포함한다.
 새 버전 패키지마다 Autodesk 권장대로 `ProductCode`를 새 GUID로 만들고 `UpgradeCode`는 유지한다. 같은 버전을 다시 만들 때도 결과 디렉터리가 이미 있으면 중단한다.
 
-UI 레이아웃은 AutoCAD 어두운 작업 화면과 맞춘 4단계 카드, 상단 고정 상태 메시지, 구분된 보조/주요/실행 버튼으로 구성한다. AutoCAD를 재시작하지 않고 레이아웃만 확인할 때는 `dotnet run --project autocad-plugin/Himec.PalettePreview/Himec.PalettePreview.csproj -c Release -- autocad-plugin/dist/palette-preview.png`를 사용한다. 미리보기는 AutoCAD 명령을 실행하지 않는다. 기존 WAV 선택과 오류 상태 표시는 `dotnet run --project autocad-plugin/Himec.PalettePreview/Himec.PalettePreview.csproj -c Release -- --self-test`로 합성 WAV를 사용해 검사한다.
+UI 레이아웃은 AutoCAD 어두운 작업 화면과 맞춘 5단계 카드, 상단 고정 상태 메시지, 구분된 보조/주요/실행 버튼으로 구성한다. AutoCAD를 재시작하지 않고 레이아웃만 확인할 때는 `dotnet run --project autocad-plugin/Himec.PalettePreview/Himec.PalettePreview.csproj -c Release -- autocad-plugin/dist/palette-preview.png`를 사용한다. 미리보기는 AutoCAD 명령을 실행하지 않는다. 합성 WAV 선택·오류·태그 목록·객체 연결·로컬 저장 검사는 `dotnet run --project autocad-plugin/Himec.PalettePreview/Himec.PalettePreview.csproj -c Release -- --self-test`로 실행한다.
 
 ## AutoCAD에서 로드
 
 - 먼저 **복사본/합성 도면**으로 시험한다. mm 도면(`INSUNITS=4`)에서 블록 하나를 만든다.
-- AutoCAD를 종료한 뒤 `./autocad-plugin/install-user.ps1 -BundlePath ./autocad-plugin/dist/0.2.1/Himec.ChangeLoop.bundle`로 사용자별 `ApplicationPlugins` 위치에 설치하고 AutoCAD를 다시 연다. 이 스크립트는 이전 버전을 `.himec-backups`에 옮겨 보존하며, AutoCAD가 실행 중이면 설치하지 않는다. 설치/신뢰 경로는 Autodesk의 [번들 설치 안내](https://help.autodesk.com/cloudhelp/2023/KOR/AutoCAD-Customization/files/GUID-5E50A846-C80B-4FFD-8DD3-C20B22098008.htm)를 따른다. 보안 설정을 끄지 않는다.
+- AutoCAD를 종료한 뒤 `./autocad-plugin/install-user.ps1 -BundlePath ./autocad-plugin/dist/0.3.1/Himec.ChangeLoop.bundle`로 사용자별 `ApplicationPlugins` 위치에 설치하고 AutoCAD를 다시 연다. 이 스크립트는 이전 버전을 `.himec-backups`에 옮겨 보존하며, AutoCAD가 실행 중이면 설치하지 않는다. 설치/신뢰 경로는 Autodesk의 [번들 설치 안내](https://help.autodesk.com/cloudhelp/2023/KOR/AutoCAD-Customization/files/GUID-5E50A846-C80B-4FFD-8DD3-C20B22098008.htm)를 따른다. 보안 설정을 끄지 않는다.
 - 명령창에 `HIMEC`을 입력한다. 팔레트가 나타나면 녹음 또는 전사문 직접 입력으로 시험한다.
 - 빌드 성공과 AutoCAD 내부 로드 성공은 다르다. 현재 검증 결과는 아래 기록을 확인한다.
 
@@ -39,7 +41,7 @@ UI 레이아웃은 AutoCAD 어두운 작업 화면과 맞춘 4단계 카드, 상
 
 - 여러 층/줄/공간에 걸친 “왼쪽 세 번째”의 정확한 범위 해석, 도면 하이라이트, 대화형 모호성 질문, 전체 회의에서 여러 지시 분리, LLM 자연어 추출, 다른 도면 연쇄 수정, PDF 주석, MCP 연동.
 - AutoCAD 2024 호환 빌드, 자동 업데이트. 현재는 검증 후 수동으로 실행하는 사용자별 설치 스크립트만 있다.
-- 사용자가 AutoCAD 2026에서 v0.1.2 로드·팔레트·수동 문장 X 0/Y +300 mm 분석을 확인했다. 녹음 WAV 파일 3개는 메타데이터(길이·형식·에너지)만 확인했다. v0.2.1 사용자별 설치·AutoCAD 재시작·새 UI 표시도 확인했다. 마이크 음성 품질·실제 API 전사·플러그인 도면 변경/UNDO는 별도 검증이다.
+- 사용자가 AutoCAD 2026에서 v0.1.2 로드·팔레트·수동 문장 X 0/Y +300 mm 분석을 확인했다. 녹음 WAV 파일 3개는 메타데이터(길이·형식·에너지)만 확인했다. v0.2.1 사용자별 설치·새 UI, v0.3.0 개발 번들의 태그 카드 표시까지 확인했다. v0.3.1 실제 AutoCAD 태그 편집 전체 흐름, 마이크 음성 품질·실제 API 전사·플러그인 도면 변경/UNDO는 별도 검증이다.
 
 ## 배포·업데이트
 

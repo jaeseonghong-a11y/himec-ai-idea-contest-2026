@@ -33,4 +33,23 @@ if (ColumnTargeting.TryThirdFromLeft(repeated, out _, out _))
 var multipleRows = new[] { columns[0], columns[1], columns[2] with { Y = 1000 } };
 if (ColumnTargeting.TryThirdFromLeft(multipleRows, out _, out _))
     throw new Exception("Multiple rows were accepted");
-Console.WriteLine($"{cases.Length + 6} parser and targeting checks passed");
+var tagSession = new RecordingTagSession { RecordingPath = "synthetic.wav" };
+var liveTag = tagSession.AddManual("왼쪽 세 번째 기둥", 12.5);
+if (liveTag.OffsetSeconds != 12.5 || liveTag.IsLinked) throw new Exception("Live manual tag failed");
+tagSession.Link(liveTag.Id, "synthetic.dxf", "1A", "INSERT", "COLUMN");
+if (!liveTag.IsLinked || liveTag.Handle != "1A") throw new Exception("Tag-object link failed");
+tagSession.Rename(liveTag.Id, "C1");
+if (liveTag.Label != "C1") throw new Exception("Tag rename failed");
+var found = tagSession.AddTranscriptMentions("C1 기둥을 옮기고 B12 보를 검토하자. 덕트도 확인하자.");
+if (found != 3 || tagSession.Tags.Count != 4) throw new Exception("Transcript mention extraction failed");
+if (tagSession.AddTranscriptMentions("C1 기둥을 옮기고 B12 보를 검토하자. 덕트도 확인하자.") != 0)
+    throw new Exception("Transcript tag deduplication failed");
+var extracted = tagSession.Tags.First(t => t.Origin == "transcript");
+tagSession.Rename(extracted.Id, "사용자 검토 태그");
+if (tagSession.AddTranscriptMentions("C1 기둥을 옮기고 B12 보를 검토하자. 덕트도 확인하자.") != 0)
+    throw new Exception("Renamed transcript tag was duplicated");
+tagSession.Unlink(liveTag.Id);
+if (liveTag.IsLinked) throw new Exception("Tag unlink failed");
+tagSession.Remove(liveTag.Id);
+if (tagSession.Tags.Count != 3) throw new Exception("Tag delete failed");
+Console.WriteLine($"{cases.Length + 14} parser, targeting and recording-tag checks passed");

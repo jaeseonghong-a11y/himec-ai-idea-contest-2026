@@ -1,6 +1,6 @@
 # HIMEC 설계 변경 플러그인 — 다운로드부터 사용까지
 
-이 ZIP은 **AutoCAD 2026용 v0.2.1-preview** 팀 공동 개발판입니다. Windows의 정식 AutoCAD 2026에서만 사용하세요. AutoCAD LT·Mac·AutoCAD 2024용이 아닙니다. **최종 기능 검증판이 아닙니다.** 실제 OpenAI 전사와 승인 후 도면 이동/UNDO는 팀이 앞으로 검증합니다. 우선 합성 시험 도면의 사본에서만 사용하세요.
+이 ZIP은 **AutoCAD 2026용 v0.3.1-preview** 팀 공동 개발판입니다. Windows의 정식 AutoCAD 2026에서만 사용하세요. AutoCAD LT·Mac·AutoCAD 2024용이 아닙니다. **최종 기능 검증판이 아닙니다.** 녹음 중 수동 객체 태그와 녹음 후 태그 검토 UI가 추가됐지만, 실시간 음성 자동 태깅·실제 API 전사·승인 후 도면 이동/UNDO는 팀이 앞으로 검증합니다. 우선 합성 시험 도면의 사본에서만 사용하세요.
 
 압축을 풀면 다음 세 항목이 있어야 합니다.
 
@@ -12,7 +12,7 @@ README_INSTALL_KO.md       이 안내문
 
 ## 1. 다운로드와 파일 확인
 
-1. 팀 저장소의 [v0.2.1-preview 배포 페이지](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/releases/tag/v0.2.1-preview)에서 `Himec.ChangeLoop-AutoCAD2026-v0.2.1-team.zip`을 다운로드하세요. 저장소의 초록색 **Code → Download ZIP**은 소스 코드이며, 설치용 ZIP과 다릅니다.
+1. 팀 저장소의 [v0.3.1-preview 배포 페이지](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/releases/tag/v0.3.1-preview)에서 `Himec.ChangeLoop-AutoCAD2026-v0.3.1-team.zip`을 다운로드하세요. 저장소의 초록색 **Code → Download ZIP**은 소스 코드이며, 설치용 ZIP과 다릅니다.
 2. 배포 페이지에 적힌 SHA-256과 다운로드한 ZIP의 해시를 비교하세요. PowerShell에서 `Get-FileHash -LiteralPath 'ZIP 파일 전체 경로' -Algorithm SHA256`을 실행하면 됩니다. 값이 다르면 설치하지 마세요.
 3. ZIP을 원하는 폴더에 압축 해제하고 위 세 항목이 보이는지 확인하세요.
 
@@ -25,7 +25,7 @@ README_INSTALL_KO.md       이 안내문
 ./install-user.ps1 -BundlePath ./Himec.ChangeLoop.bundle
 ```
 
-3. 화면에 `InstalledVersion : 0.2.1.0`과 설치 경로가 나오면 설치가 끝난 것입니다. 스크립트는 내 사용자 계정의 `%APPDATA%\Autodesk\ApplicationPlugins\Himec.ChangeLoop.bundle`에 설치하며, 이전 버전은 `.himec-backups`에 보존합니다. 관리자 권한은 필요 없습니다.
+3. 화면에 `InstalledVersion : 0.3.1.0`과 설치 경로가 나오면 설치가 끝난 것입니다. 스크립트는 내 사용자 계정의 `%APPDATA%\Autodesk\ApplicationPlugins\Himec.ChangeLoop.bundle`에 설치하며, 이전 버전은 `.himec-backups`에 보존합니다. 관리자 권한은 필요 없습니다.
 4. 회사 PC의 PowerShell 실행 정책이 스크립트를 막으면 보안 설정을 임의로 낮추지 말고 PC 관리자/팀장에게 문의하세요. 이때 AutoCAD를 종료한 상태에서 위 사용자별 설치 경로를 확인하고, 기존 번들을 별도로 백업한 다음 압축 속 `.bundle` 폴더를 복사하는 방법도 있습니다.
 5. AutoCAD 2026을 다시 실행하세요. 새 버전은 **Git pull만으로 자동 갱신되지 않으며**, 업데이트할 때마다 이 설치 절차와 재시작이 필요합니다.
 
@@ -35,6 +35,12 @@ README_INSTALL_KO.md       이 안내문
 2. 처음에는 실제 업무 도면 대신 합성 시험 도면을 **파일로 열어** 사용하세요. 저장소의 `autocad-plugin/tests/three_columns_mm.dxf`를 사용할 수 있습니다. 이 파일을 현재 도면 안에 통째로 **삽입**하면 기둥 3개가 하나의 외부 블록으로 취급돼 대상 선택이 되지 않습니다.
 3. 팔레트에서 직접 문장을 입력해 시험할 수 있습니다. 예: `왼쪽에서 세번째 이 기둥을 위로 30cm 옮기자`. `전사문에서 이동 지시 찾기`를 누르면 제안 이동량 **X 0 mm / Y +300 mm**를 보여줍니다. 이는 로컬 규칙 분석이며 AI가 기둥을 확정한 것은 아닙니다.
 4. `후보 찾기`는 제한된 조건에서만 왼쪽 세 번째 기둥을 추천합니다. 대상은 반드시 `도면에서 대상 직접 선택`으로 블록을 클릭해 확정하세요. 지시와 도면을 확인한 뒤에만 `지시 승인`과 `승인된 변경 실행`을 순서대로 사용하세요. 실행은 자동 저장하지 않으며, 문제가 있으면 AutoCAD `UNDO`를 사용하세요. **현재 이 마지막 실행 흐름은 최종 검증 전이므로 합성 시험 사본에서만 시도하세요.**
+
+### 녹음 객체 태그 사용
+
+- 녹음 중 `녹음 중 객체 태그`를 누르고 도면 객체를 클릭하면 녹음 시작 후 시각과 객체 핸들이 로컬에 기록됩니다. 태그 이름을 먼저 입력해 둘 수 있습니다. 이 작업은 도면을 수정하지 않습니다.
+- 녹음 후 전사문을 입력하거나 API 전사를 완료한 뒤 `전사문에서 객체 찾기`를 누르면 언급된 `C1`, `B12`, `기둥`, `덕트` 등이 목록에 **미지정**으로 추가됩니다. API 전사를 성공하면 이 추출이 자동 실행됩니다. 현재는 말하는 도중 음성을 자동 인식하지 않습니다.
+- 목록에서 태그 이름을 수정하고, `태그 추가`·`선택 태그 삭제`·`객체 연결 해제`를 사용할 수 있습니다. `선택 태그에 객체 지정`으로 도면의 대상을 직접 클릭하면 **지정 완료**가 됩니다. 태그는 `%LOCALAPPDATA%\Himec\Sessions`에 해당 WAV별로 저장되며, 파일을 다시 선택하면 불러옵니다. 저장한 핸들이 나중에도 유효한지 자동 재검사하지는 않습니다.
 
 ## 4. 녹음과 전사 API 키
 
