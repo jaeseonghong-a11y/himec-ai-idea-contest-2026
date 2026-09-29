@@ -1,0 +1,282 @@
+{
+  "name": "기본 (이 도면 세트의 레이어 이름을 따름)",
+  "note": "역할별 레이어 체계. 사무소마다 이 파일만 바꾸면 된다. 색은 AutoCAD 색 번호, 선 굵기는 1/100 mm, 선종류는 도면에 있는 이름. layers의 첫 번째가 새로 그릴 때 쓰는 레이어이고 나머지는 같은 역할로 취급하는 레이어(다른 도면에서 가져온 기호의 레이어 등)이다.",
+  "scale": 100,
+  "ltscale": 300,
+  "roles": {
+    "grid": {
+      "layers": [
+        "CEN"
+      ],
+      "color": 1,
+      "lineweight": 13,
+      "linetype": "CENTER",
+      "desc": "그리드 중심선"
+    },
+    "grid_tag": {
+      "layers": [
+        "GRID-TAG",
+        "RXSYMBOL"
+      ],
+      "color": 1,
+      "lineweight": 18,
+      "linetype": "Continuous",
+      "desc": "그리드 기호"
+    },
+    "column": {
+      "layers": [
+        "COL"
+      ],
+      "color": 2,
+      "lineweight": 50,
+      "linetype": "Continuous",
+      "desc": "기둥, 콘크리트 벽체"
+    },
+    "column_tag": {
+      "layers": [
+        "COL-TAG"
+      ],
+      "color": 2,
+      "lineweight": 18,
+      "linetype": "Continuous",
+      "desc": "기둥 타입 표기"
+    },
+    "wall": {
+      "layers": [
+        "WAL"
+      ],
+      "color": 3,
+      "lineweight": 40,
+      "linetype": "Continuous",
+      "desc": "벽"
+    },
+    "wall_finish": {
+      "layers": [
+        "마감선",
+        "단열재",
+        "FIN"
+      ],
+      "color": 8,
+      "lineweight": 13,
+      "linetype": "Continuous",
+      "desc": "마감, 단열"
+    },
+    "window": {
+      "layers": [
+        "WID",
+        "WID-S"
+      ],
+      "color": 4,
+      "lineweight": 25,
+      "linetype": "Continuous",
+      "desc": "창호"
+    },
+    "door": {
+      "layers": [
+        "DOOR",
+        "DOOR-S",
+        "RXDOOR"
+      ],
+      "color": 4,
+      "lineweight": 25,
+      "linetype": "Continuous",
+      "desc": "문"
+    },
+    "beam": {
+      "layers": [
+        "HID"
+      ],
+      "color": 8,
+      "lineweight": 18,
+      "linetype": "HIDDEN",
+      "desc": "보(은선)"
+    },
+    "dim": {
+      "layers": [
+        "RXDIM"
+      ],
+      "color": 6,
+      "lineweight": 13,
+      "linetype": "Continuous",
+      "desc": "치수"
+    },
+    "site": {
+      "layers": [
+        "SITE"
+      ],
+      "color": 30,
+      "lineweight": 35,
+      "linetype": "PHANTOM",
+      "desc": "대지경계선"
+    },
+    "core": {
+      "layers": [
+        "CORE"
+      ],
+      "color": 34,
+      "lineweight": 25,
+      "linetype": "Continuous",
+      "desc": "계단, 승강기"
+    },
+    "core_wall": {
+      "layers": [
+        "CORE-WAL"
+      ],
+      "color": 3,
+      "lineweight": 40,
+      "linetype": "Continuous",
+      "desc": "승강로·계단실 벽"
+    },
+    "text": {
+      "layers": [
+        "TEXT"
+      ],
+      "color": 7,
+      "lineweight": 18,
+      "linetype": "Continuous",
+      "desc": "문자"
+    },
+    "schedule": {
+      "layers": [
+        "SCHEDULE"
+      ],
+      "color": 7,
+      "lineweight": 18,
+      "linetype": "Continuous",
+      "desc": "일람표"
+    },
+    "frame": {
+      "layers": [
+        "FRAME"
+      ],
+      "color": 7,
+      "lineweight": 70,
+      "linetype": "Continuous",
+      "desc": "도면 틀, 표제란"
+    },
+    "elec_power": {
+      "layers": [
+        "E-POWER"
+      ],
+      "color": 30,
+      "lineweight": 18,
+      "linetype": "Continuous",
+      "desc": "전기 콘센트·스위치·분전반"
+    },
+    "elec_light": {
+      "layers": [
+        "E-LIGHT"
+      ],
+      "color": 30,
+      "lineweight": 18,
+      "linetype": "Continuous",
+      "desc": "조명"
+    },
+    "mech_diff": {
+      "layers": [
+        "M-DIFF"
+      ],
+      "color": 140,
+      "lineweight": 18,
+      "linetype": "Continuous",
+      "desc": "디퓨저"
+    },
+    "mech_duct": {
+      "layers": [
+        "M-DUCT"
+      ],
+      "color": 140,
+      "lineweight": 25,
+      "linetype": "Continuous",
+      "desc": "덕트"
+    },
+    "fire_spk": {
+      "layers": [
+        "F-SPK"
+      ],
+      "color": 10,
+      "lineweight": 18,
+      "linetype": "Continuous",
+      "desc": "스프링클러 헤드"
+    },
+    "fire_det": {
+      "layers": [
+        "F-DET"
+      ],
+      "color": 10,
+      "lineweight": 18,
+      "linetype": "Continuous",
+      "desc": "감지기"
+    }
+  },
+  "dimstyle": {
+    "name": "HIMEC-100",
+    "text_height": 250,
+    "tick": 120,
+    "ext_beyond": 150,
+    "ext_offset": 200,
+    "text_gap": 80
+  },
+  "text": {
+    "style": "KOR",
+    "font": "malgun.ttf",
+    "height": 250,
+    "title_height": 450
+  },
+  "lineweight_rules": {
+    "note": "선 굵기 규칙(1/100 mm). wall: [두께 상한, 굵기]. beam: scale은 굵기 단계, girder·beam은 기본 단계, span은 [경간 상한, 더할 단계], width는 도면에 그리는 보 폭",
+    "wall": [
+      [
+        150,
+        30
+      ],
+      [
+        200,
+        35
+      ],
+      [
+        250,
+        40
+      ],
+      [
+        350,
+        50
+      ],
+      [
+        99999,
+        60
+      ]
+    ],
+    "beam": {
+      "scale": [
+        13,
+        18,
+        25,
+        30,
+        35,
+        40,
+        50
+      ],
+      "girder": 2,
+      "beam": 1,
+      "span": [
+        [
+          5000,
+          0
+        ],
+        [
+          7500,
+          1
+        ],
+        [
+          99999,
+          2
+        ]
+      ],
+      "width": {
+        "girder": 400,
+        "beam": 300
+      }
+    }
+  }
+}
