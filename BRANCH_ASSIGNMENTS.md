@@ -1,5 +1,13 @@
 # 현재 브랜치 배정
 
+## AutoCAD 2024 호환 작업 — archuni 별도 과제 (2026-09-29)
+
+| 담당 | 지정 브랜치 | 이슈 | 담당 파일 |
+|---|---|---|---|
+| `archuni` | `work/archuni/r03` (팀장 생성) | [#35 AutoCAD 2024 전용 플러그인](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/35) | `autocad-plugin/`의 2024 전용 프로젝트·번들·설치/시험 문서. 공유 코어 변경 시 2026 회귀 검사 필수 |
+
+기존 `work/archuni/r02`의 [PR #34](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/34)는 별도로 열려 있다. 두 과제는 서로 다른 clone/worktree에서 작업하고, r02 변경을 r03에 복사하거나 r02 브랜치를 새 과제에 재사용하지 않는다. 2024용 배포는 2026용과 공존하게 만든다. 시작 요청문은 `prompts/TEAM_AUTOCAD_2024_START.md`다.
+
 ## Round 02 — 설계 변경 피드백 루프 (2026-09-29)
 
 기준: `docs/PROJECT_BRIEF.md`, `prototype/CONTRACT.md`. 아래 `r02` 브랜치는 팀장이 2026-09-29 `main`의 `14f199e`에서 생성했고 원격 존재를 확인했다. 기존 `r01` 브랜치를 새 과제용으로 재사용하거나 팀원이 직접 새 브랜치를 만들지 않는다. 새 라운드 시작 요청문은 `prompts/ROUND_02_START.md`에 있다.

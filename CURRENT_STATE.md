@@ -2,6 +2,8 @@
 
 ## 현재 상태 (2026-09-29, 팀장 AI)
 
+- AutoCAD 2024 호환판: `archuni`에게 [#35](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/35)를 별도 배정했다. `work/archuni/r03`에서 2024 전용 .NET Framework 4.8 빌드·공존 번들·실제 호스트 검증을 진행한다. 기존 #18/PR #34는 유지한다. 2024 호환 기능은 아직 구현·검증되지 않았다.
+
 - 출품안 확정: `설계 변경 피드백 루프`, 분야 `설계·엔지니어링`. 기준 문서는 `docs/PROJECT_BRIEF.md`, 팀원 초안은 `HIMEC_아이디어_평가_및_워크플로우.md`.
 - 목표: 2026-09-30까지 합성 대본 → 구조화 변경 → PDF 주석 → 사람 승인 데모를 먼저 완성. 이어 승인된 C1 이동 한 건을 합성 DXF 2장에 반영·검사한다. 관계도는 선택 기능.
 - 팀원 4명 모두 API 키 사용 가능. OpenAI·Anthropic·Google Gemini 세 제공자 사용 예정이나 실제 통합·호출·비용 상한은 아직 검증 전. 키는 각자 로컬에만 둔다.
