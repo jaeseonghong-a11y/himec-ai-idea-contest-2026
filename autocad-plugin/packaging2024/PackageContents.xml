@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AutoCAD 2024 (R24.3) manifest. Kept separate from packaging/PackageContents.xml so
+  the 2024 and 2026 bundles can be installed at the same time: different Name,
+  ProductCode, UpgradeCode, module file and install folder.
+-->
+<ApplicationPackage SchemaVersion="1.0"
+                    AppVersion="0.1.0.0"
+                    ProductCode="{2840819E-2A42-40C3-8EB2-BCCE5BB71FA3}"
+                    UpgradeCode="{DF005744-90EA-4B40-96AF-85DA524BDB8F}"
+                    Name="HIMEC Change Loop 2024"
+                    Description="Reviewed drawing change demo for AutoCAD 2024">
+  <Components>
+    <RuntimeRequirements OS="Win64" Platform="AutoCAD" SeriesMin="R24.3" SeriesMax="R24.3" />
+    <ComponentEntry AppName="HimecChangeLoop2024"
+                    AppDescription="Record, review and apply one approved block move"
+                    ModuleName="./Contents/Windows/Himec.AutoCad2024.dll"
+                    AppType=".Net"
+                    LoadReasons="LoadOnCommandInvocation">
+      <AssemblyMappings>
+        <AssemblyMappingFolder Path="./Contents/Windows" />
+      </AssemblyMappings>
+      <Commands GroupName="HIMEC_CHANGE">
+        <Command Global="HIMEC" Local="HIMEC" />
+        <Command Global="HIMEC_TAG_PICK" Local="HIMEC_TAG_PICK" />
+        <Command Global="HIMEC_PICK" Local="HIMEC_PICK" />
+        <Command Global="HIMEC_SUGGEST" Local="HIMEC_SUGGEST" />
+        <Command Global="HIMEC_APPLY" Local="HIMEC_APPLY" />
+      </Commands>
+    </ComponentEntry>
+  </Components>
+</ApplicationPackage>

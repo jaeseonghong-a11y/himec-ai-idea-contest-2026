@@ -63,9 +63,9 @@ public sealed class RecordingTagSession
         {
             var quote = sentence.Trim();
             if (quote.Length == 0) continue;
-            var labels = ExplicitId.Matches(quote).Select(m => m.Value.ToUpperInvariant()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            var labels = ExplicitId.Matches(quote).Cast<Match>().Select(m => m.Value.ToUpperInvariant()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             if (labels.Length == 0)
-                labels = GenericObject.Matches(quote).Select(m => m.Value).Distinct().ToArray();
+                labels = GenericObject.Matches(quote).Cast<Match>().Select(m => m.Value).Distinct().ToArray();
             foreach (var label in labels)
             {
                 if (Tags.Any(t => t.Origin == "transcript" && t.ExtractionKey == label && t.SourceQuote == quote)) continue;

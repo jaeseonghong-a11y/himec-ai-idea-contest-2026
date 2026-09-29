@@ -7,7 +7,7 @@ namespace Himec.AutoCad2026;
 internal sealed class RecordingTagPanel : UserControl
 {
     private readonly DataGridView _grid = new();
-    private readonly TextBox _newLabel = new() { PlaceholderText = "태그 이름 (예: C1 기둥)" };
+    private readonly TextBox _newLabel = new TextBox().WithHint("태그 이름 (예: C1 기둥)");
     private readonly Button _add = new() { Text = "태그 추가" };
     private readonly Button _pickNow = new() { Text = "녹음 중 객체 태그", Enabled = false };
     private readonly Button _link = new() { Text = "선택 태그에 객체 지정" };

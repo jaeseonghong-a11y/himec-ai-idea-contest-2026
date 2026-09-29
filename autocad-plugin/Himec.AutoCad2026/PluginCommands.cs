@@ -118,7 +118,8 @@ public sealed class PluginCommands : IExtensionApplication
             change.Reviewer is null || change.ReviewedAt is null ||
             change.Action != "move" || change.TargetHandle is null ||
             change.TargetDrawing != doc.Name || SelectedObjectId.IsNull ||
-            !double.IsFinite(change.DxMm) || !double.IsFinite(change.DyMm) ||
+            double.IsNaN(change.DxMm) || double.IsInfinity(change.DxMm) ||
+            double.IsNaN(change.DyMm) || double.IsInfinity(change.DyMm) ||
             (change.DxMm == 0 && change.DyMm == 0))
         {
             doc?.Editor.WriteMessage("\nHIMEC: 승인·도면·대상 조건이 맞지 않아 실행하지 않았습니다.\n");

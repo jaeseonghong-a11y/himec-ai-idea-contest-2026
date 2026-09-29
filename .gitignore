@@ -29,6 +29,7 @@ __pycache__/
 autocad-plugin/**/bin/
 autocad-plugin/**/obj/
 autocad-plugin/dist/
+autocad-plugin/dist2024/
 
 # Local source package; the extracted workflow kit is tracked.
 team-workflow-kit-*.zip

@@ -11,8 +11,10 @@ internal static class OpenAiTranscriber
 
     public static async Task<string> TranscribeAsync(string wavPath, string? sessionKey = null)
     {
+        // .NET Framework's IsNullOrWhiteSpace lacks the NotNullWhen annotation, so the
+        // net48 build needs the null-forgiving operator the check already guarantees.
         var key = !string.IsNullOrWhiteSpace(sessionKey)
-            ? sessionKey.Trim()
+            ? sessionKey!.Trim()
             : Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         if (string.IsNullOrWhiteSpace(key))
             throw new InvalidOperationException("전사 API 키가 없습니다. 팔레트의 'API 키 입력'을 누르거나 전사문을 직접 입력하세요.");
@@ -37,6 +39,6 @@ internal static class OpenAiTranscriber
         var transcript = text.GetString();
         if (string.IsNullOrWhiteSpace(transcript))
             throw new InvalidOperationException("전사 결과가 비어 있습니다. 녹음 장치와 음성을 확인한 뒤 다시 시도하세요.");
-        return transcript;
+        return transcript!;
     }
 }

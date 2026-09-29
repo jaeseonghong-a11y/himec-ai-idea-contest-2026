@@ -25,9 +25,9 @@ public static class RealtimeTagging
         string currentDrawing,
         IEnumerable<RecordingObjectCandidate> drawingCandidates)
     {
-        ArgumentNullException.ThrowIfNull(session);
-        ArgumentNullException.ThrowIfNull(turn);
-        ArgumentNullException.ThrowIfNull(drawingCandidates);
+        if (session is null) throw new ArgumentNullException(nameof(session));
+        if (turn is null) throw new ArgumentNullException(nameof(turn));
+        if (drawingCandidates is null) throw new ArgumentNullException(nameof(drawingCandidates));
         if (string.IsNullOrWhiteSpace(turn.Id)) throw new ArgumentException("전사 문장 ID가 필요합니다.");
         if (double.IsNaN(turn.ApproximateOffsetSeconds) || double.IsInfinity(turn.ApproximateOffsetSeconds) ||
             turn.ApproximateOffsetSeconds < 0) throw new ArgumentOutOfRangeException(nameof(turn));
@@ -41,11 +41,12 @@ public static class RealtimeTagging
             session.ProcessedTranscriptTurnIds.Add(turn.Id);
             return [];
         }
-        var ids = ExplicitId.Matches(quote).Select(m => m.Value.ToUpperInvariant())
+        // MatchCollection is only IEnumerable<Match> on .NET Core; Cast keeps both targets working.
+        var ids = ExplicitId.Matches(quote).Cast<Match>().Select(m => m.Value.ToUpperInvariant())
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var labels = ids.Length > 0
             ? ids
-            : GenericObject.Matches(quote).Select(m => m.Value).Distinct().ToArray();
+            : GenericObject.Matches(quote).Cast<Match>().Select(m => m.Value).Distinct().ToArray();
         var candidates = drawingCandidates.Where(c =>
             string.Equals(c.Drawing, currentDrawing, StringComparison.OrdinalIgnoreCase) &&
             !string.IsNullOrWhiteSpace(c.Handle)).ToArray();

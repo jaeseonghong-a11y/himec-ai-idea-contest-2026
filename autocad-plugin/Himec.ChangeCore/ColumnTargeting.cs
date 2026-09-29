@@ -11,7 +11,7 @@ public static class ColumnTargeting
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     public static bool IsColumnLabel(string name, string layer) =>
-        name.Contains("기둥", StringComparison.Ordinal) || layer.Contains("기둥", StringComparison.Ordinal) ||
+        name.IndexOf("기둥", StringComparison.Ordinal) >= 0 || layer.IndexOf("기둥", StringComparison.Ordinal) >= 0 ||
         ColumnToken.IsMatch(name) || ColumnToken.IsMatch(layer);
 
     public static bool TryThirdFromLeft(IReadOnlyList<ColumnCandidate> candidates,
@@ -23,7 +23,8 @@ public static class ColumnTargeting
             reason = $"기둥 후보가 {candidates.Count}개뿐입니다. 도면을 '열기'로 연 뒤 다시 찾거나 직접 선택하세요.";
             return false;
         }
-        if (candidates.Any(x => !double.IsFinite(x.X) || !double.IsFinite(x.Y)))
+        if (candidates.Any(x => double.IsNaN(x.X) || double.IsInfinity(x.X) ||
+                                double.IsNaN(x.Y) || double.IsInfinity(x.Y)))
         {
             reason = "기둥 좌표가 유효하지 않아 직접 선택해야 합니다.";
             return false;

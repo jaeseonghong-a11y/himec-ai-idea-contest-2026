@@ -29,7 +29,7 @@ public static class InstructionParser
 
         var amountText = match.Groups["amount"].Value.Replace(',', '.');
         if (!double.TryParse(amountText, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var amount)
-            || !double.IsFinite(amount) || amount <= 0 || amount > 100_000)
+            || double.IsNaN(amount) || double.IsInfinity(amount) || amount <= 0 || amount > 100_000)
         {
             reason = "이동량이 유효하지 않습니다.";
             return false;
