@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Text.Json.Serialization;
 
 namespace Himec.ChangeCore;
 
@@ -14,7 +15,26 @@ public sealed class RecordingTag
     public string? Handle { get; set; }
     public string? EntityType { get; set; }
     public string? Layer { get; set; }
+    public string? TranscriptTurnId { get; set; }
+    public double? ApproximateOffsetSeconds { get; set; }
+    public string? SuggestionStatus { get; set; }
+    public List<string> CandidateHandles { get; set; } = [];
+    public DateTimeOffset? ConfirmedByUserAt { get; set; }
     public bool IsLinked => !string.IsNullOrWhiteSpace(Drawing) && !string.IsNullOrWhiteSpace(Handle);
+
+    // Old session JSON has no SuggestionStatus. Derive its display state without rewriting it.
+    [JsonIgnore]
+    public string EffectiveSuggestionStatus => SuggestionStatus ?? (IsLinked
+        ? RecordingTagSuggestionStatus.DirectLinked
+        : RecordingTagSuggestionStatus.SelectionNeeded);
+}
+
+public static class RecordingTagSuggestionStatus
+{
+    public const string DirectLinked = "direct_linked";
+    public const string Proposed = "proposed";
+    public const string SelectionNeeded = "selection_needed";
+    public const string Confirmed = "confirmed";
 }
 
 public sealed class RecordingTagSession
@@ -25,6 +45,7 @@ public sealed class RecordingTagSession
     public string RecordingPath { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
     public List<RecordingTag> Tags { get; set; } = [];
+    public List<string> ProcessedTranscriptTurnIds { get; set; } = [];
 
     public RecordingTag AddManual(string label, double? offsetSeconds = null)
     {
@@ -59,7 +80,16 @@ public sealed class RecordingTagSession
     {
         var clean = label.Trim();
         if (clean.Length is < 1 or > 80) throw new ArgumentException("태그 이름은 1~80자로 입력하세요.");
-        Find(id).Label = clean;
+        var tag = Find(id);
+        if (tag.SuggestionStatus == RecordingTagSuggestionStatus.Proposed &&
+            !string.Equals(tag.Label, clean, StringComparison.OrdinalIgnoreCase))
+        {
+            // A proposal for the old label must not remain attached after an edit.
+            ClearLink(tag);
+            tag.CandidateHandles.Clear();
+            tag.SuggestionStatus = RecordingTagSuggestionStatus.SelectionNeeded;
+        }
+        tag.Label = clean;
     }
 
     public void Link(string id, string drawing, string handle, string entityType, string layer)
@@ -71,19 +101,36 @@ public sealed class RecordingTagSession
         tag.Handle = handle;
         tag.EntityType = entityType;
         tag.Layer = layer;
+        tag.SuggestionStatus = RecordingTagSuggestionStatus.DirectLinked;
+        tag.ConfirmedByUserAt = null;
     }
 
     public void Unlink(string id)
     {
         var tag = Find(id);
-        tag.Drawing = null;
-        tag.Handle = null;
-        tag.EntityType = null;
-        tag.Layer = null;
+        ClearLink(tag);
+        tag.SuggestionStatus = RecordingTagSuggestionStatus.SelectionNeeded;
+        tag.ConfirmedByUserAt = null;
+    }
+
+    public void Confirm(string id, DateTimeOffset confirmedAt)
+    {
+        var tag = Find(id);
+        if (!tag.IsLinked) throw new InvalidOperationException("도면 객체를 먼저 연결하세요.");
+        tag.SuggestionStatus = RecordingTagSuggestionStatus.Confirmed;
+        tag.ConfirmedByUserAt = confirmedAt;
     }
 
     public void Remove(string id) => Tags.Remove(Find(id));
 
     public RecordingTag Find(string id) => Tags.FirstOrDefault(t => t.Id == id)
         ?? throw new KeyNotFoundException("선택한 태그를 찾지 못했습니다.");
+
+    private static void ClearLink(RecordingTag tag)
+    {
+        tag.Drawing = null;
+        tag.Handle = null;
+        tag.EntityType = null;
+        tag.Layer = null;
+    }
 }

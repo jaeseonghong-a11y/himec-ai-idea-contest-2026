@@ -1,4 +1,5 @@
 using Himec.ChangeCore;
+using System.Text.Json;
 
 var cases = new (string Text, double X, double Y)[]
 {
@@ -52,4 +53,69 @@ tagSession.Unlink(liveTag.Id);
 if (liveTag.IsLinked) throw new Exception("Tag unlink failed");
 tagSession.Remove(liveTag.Id);
 if (tagSession.Tags.Count != 3) throw new Exception("Tag delete failed");
-Console.WriteLine($"{cases.Length + 14} parser, targeting and recording-tag checks passed");
+
+var rtSession = new RecordingTagSession { RecordingPath = "synthetic.wav" };
+var drawingObjects = new[]
+{
+    new RecordingObjectCandidate("test.dxf", "20", ["C1"], "INSERT", "COLUMN"),
+    new RecordingObjectCandidate("test.dxf", "30", ["B12"], "INSERT", "BEAM"),
+    new RecordingObjectCandidate("test.dxf", "31", ["B-12"], "INSERT", "BEAM"),
+    new RecordingObjectCandidate("other.dxf", "40", ["C1"], "INSERT", "COLUMN")
+};
+var one = RealtimeTagging.AddCompletedTurn(rtSession,
+    new CompletedTranscriptTurn("turn-1", "C1 기둥을 옮기자", 2.4), "test.dxf", drawingObjects);
+if (one.Count != 1 || one[0].Handle != "20" || one[0].CandidateHandles.Single() != "20" ||
+    one[0].EffectiveSuggestionStatus != RecordingTagSuggestionStatus.Proposed ||
+    one[0].ConfirmedByUserAt is not null || one[0].ApproximateOffsetSeconds != 2.4)
+    throw new Exception("Unique explicit ID was not a reviewable proposal");
+if (RealtimeTagging.AddCompletedTurn(rtSession,
+    new CompletedTranscriptTurn("turn-1", "C1 기둥을 옮기자", 2.4), "test.dxf", drawingObjects).Count != 0)
+    throw new Exception("Completed turn was duplicated");
+rtSession.Remove(one[0].Id);
+if (RealtimeTagging.AddCompletedTurn(rtSession,
+    new CompletedTranscriptTurn("turn-1", "C1 기둥을 옮기자", 2.4), "test.dxf", drawingObjects).Count != 0)
+    throw new Exception("Deleted turn was re-added by a repeated completion");
+one = RealtimeTagging.AddCompletedTurn(rtSession,
+    new CompletedTranscriptTurn("turn-1b", "C1 기둥을 옮기자", 2.5), "test.dxf", drawingObjects);
+rtSession.Rename(one[0].Id, "C2");
+if (one[0].IsLinked || one[0].CandidateHandles.Count != 0 ||
+    one[0].EffectiveSuggestionStatus != RecordingTagSuggestionStatus.SelectionNeeded)
+    throw new Exception("Edited proposal retained an unsafe object link");
+var many = RealtimeTagging.AddCompletedTurn(rtSession,
+    new CompletedTranscriptTurn("turn-2", "B12 보를 검토하자", 4.1), "test.dxf", drawingObjects);
+if (many.Count != 1 || many[0].IsLinked ||
+    !many[0].CandidateHandles.SequenceEqual(["30", "31"]) ||
+    many[0].EffectiveSuggestionStatus != RecordingTagSuggestionStatus.SelectionNeeded)
+    throw new Exception("Multiple objects were automatically linked");
+var none = RealtimeTagging.AddCompletedTurn(rtSession,
+    new CompletedTranscriptTurn("turn-3", "E5 장비를 검토하자", 6.0), "test.dxf", drawingObjects);
+if (none.Count != 1 || none[0].IsLinked || none[0].CandidateHandles.Count != 0)
+    throw new Exception("Unknown explicit ID was automatically linked");
+var generic = RealtimeTagging.AddCompletedTurn(rtSession,
+    new CompletedTranscriptTurn("turn-4", "왼쪽 세 번째 기둥을 옮기자", 8.0), "test.dxf", drawingObjects);
+if (generic.Count != 1 || generic[0].IsLinked || generic[0].CandidateHandles.Count != 0)
+    throw new Exception("Relative or generic mention was automatically linked");
+try { rtSession.Confirm(many[0].Id, DateTimeOffset.UtcNow); throw new Exception("Unlinked tag was confirmed"); }
+catch (InvalidOperationException) { }
+rtSession.Link(many[0].Id, "test.dxf", "31", "INSERT", "BEAM");
+var approvedAt = new DateTimeOffset(2026, 9, 29, 12, 0, 0, TimeSpan.Zero);
+rtSession.Confirm(many[0].Id, approvedAt);
+if (many[0].EffectiveSuggestionStatus != RecordingTagSuggestionStatus.Confirmed ||
+    many[0].ConfirmedByUserAt != approvedAt) throw new Exception("User confirmation was not recorded");
+rtSession.Unlink(many[0].Id);
+if (many[0].IsLinked || many[0].ConfirmedByUserAt is not null ||
+    many[0].EffectiveSuggestionStatus != RecordingTagSuggestionStatus.SelectionNeeded)
+    throw new Exception("Unlinked tag remained confirmed");
+var legacyJson = """{"RecordingPath":"old.wav","Tags":[{"Id":"legacy","Label":"C1","Origin":"manual","Drawing":"old.dxf","Handle":"A"}]}""";
+var legacy = JsonSerializer.Deserialize<RecordingTagSession>(legacyJson)
+    ?? throw new Exception("Legacy recording session did not deserialize");
+if (legacy.Tags.Count != 1 || legacy.Tags[0].EffectiveSuggestionStatus != RecordingTagSuggestionStatus.DirectLinked ||
+    legacy.Tags[0].CandidateHandles.Count != 0)
+    throw new Exception("Legacy linked tag lost its state");
+var roundTrip = JsonSerializer.Deserialize<RecordingTagSession>(JsonSerializer.Serialize(rtSession))
+    ?? throw new Exception("Realtime session did not deserialize");
+if (roundTrip.Tags.Count != rtSession.Tags.Count ||
+    roundTrip.Tags.First(t => t.TranscriptTurnId == "turn-1b").ApproximateOffsetSeconds != 2.5 ||
+    !roundTrip.ProcessedTranscriptTurnIds.Contains("turn-1"))
+    throw new Exception("Realtime tag contract did not round-trip");
+Console.WriteLine("Parser, targeting, legacy recording tags, and realtime tag contract checks passed");
