@@ -12,6 +12,8 @@ Git clone, fetch, checkout, pull, commit, push, PR 생성은 팀원 AI가 처리
 
 ## 팀원이 AI에 붙여넣을 파일
 
+- 현재 Round 02 작업 시작: `prompts/ROUND_02_START.md` (세 팀원 공통, 로그인 계정으로 담당 자동 선택)
+
 - 처음 참여할 때: `prompts/TEAM_FIRST_START.md`
 - 작업을 끝내고 병합 요청할 때: `prompts/TEAM_REQUEST_MERGE.md`
 - 병합된 뒤 새 작업을 원할 때: `prompts/TEAM_AFTER_MERGE.md`
