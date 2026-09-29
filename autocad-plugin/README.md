@@ -45,4 +45,4 @@ UI 레이아웃은 AutoCAD 어두운 작업 화면과 맞춘 4단계 카드, 상
 
 플러그인은 각 사용자 PC에 설치되는 DLL이다. 새 버전은 서명·검증·설치와 AutoCAD 재시작/재로드가 필요하다. AI 해석 서비스를 별도 HTTPS API로 운영하면 그 서버 쪽은 모든 사용자에게 한 번에 갱신할 수 있지만, **서버 배포만으로 설치된 DLL이 자동 교체되지는 않는다.** Vercel은 선택 가능한 서버 호스팅 중 하나일 뿐 필수 구성 요소가 아니다. 버전과 롤백을 관리하는 업데이트 절차를 후속 작업으로 둔다.
 
-팀원이 빌드 도구 없이 설치할 수 있는 시험용 Release, ZIP 해시, AI에게 붙여넣을 설치 요청은 [`docs/AUTOCAD_PLUGIN_TEAM_INSTALL.md`](../docs/AUTOCAD_PLUGIN_TEAM_INSTALL.md)에 정리했다. 소스는 팀이 함께 개발할 수 있도록 `main`에서 공유하며, 기능 검증 완료를 뜻하지 않는다.
+팀원이 빌드 도구 없이 설치할 수 있는 시험용 Release, ZIP 해시, AI에게 붙여넣을 설치 요청은 [`docs/AUTOCAD_PLUGIN_TEAM_INSTALL.md`](../docs/AUTOCAD_PLUGIN_TEAM_INSTALL.md)에 정리했다. ZIP에는 독립적인 [`README_INSTALL_KO.md`](README_INSTALL_KO.md)와 설치 스크립트도 포함한다. `package-team.ps1`이 이 세 항목과 필수 DLL을 확인하며 팀 배포 ZIP을 만든다. 소스는 팀이 함께 개발할 수 있도록 `main`에서 공유하며, 기능 검증 완료를 뜻하지 않는다.
