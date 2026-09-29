@@ -140,11 +140,10 @@ G = fresh(); C.newProjectDemo(G);
   ev.wall_thick = 150; G.project.core_wall_thick = 250; C.recompute(G); const st = G.cores.find(c => c.id === "ST-1").rect, er = G.cores.find(c => c.id === "EV-1").rect;
   ok("코어 벽 두께: 기본값과 코어별 값", st.T === 250 && er.T === 150 && er.walls.find(w => w.side === "N").y1 - er.walls.find(w => w.side === "N").y0 === 150 && st.walls.find(w => w.side === "E").x1 - st.walls.find(w => w.side === "E").x0 === 250);
   ok("코어 치수는 바뀐 벽 두께 바깥에 놓임", (() => { const d = G.dims2.find(d => d.id === "DC-ST-1-w"); return d.side === "N" && d.ext === st.y1 + 250 + 80; })());
-  // 두께를 바꾼 계획안도 도면으로 그려 확인한다
-  C.setWallThick(G, 300, wallsOf("Y1").map(e => e.id).concat(wallsOf("Y3").map(e => e.id)));
-  { C.addGridFree(G, "y", 6500); C.addGridFree(G, "x", 16500);      // 거더에 얹힌 보(6000)와 짧은 보들
-    const gid = (ax, v) => Object.values(G.grids).find(x => x.axis === ax && x.coord === v).id, yb = gid("y", 6500), xb = gid("x", 16500), beam = (a, b, along) => C.addEdge(G, { a: { xi: a[0], yj: a[1] }, b: { xi: b[0], yj: b[1] }, along }, "beam");
-    beam([gid("x", 9000), yb], [gid("x", 15000), yb], yb); beam([gid("x", 15000), yb], [xb, yb], yb); beam([xb, yb], [gid("x", 21000), yb], yb); beam([xb, gid("y", 3500)], [xb, yb], xb); }
+  // 시연 시나리오의 끝 상태(벽 두께, 코어 벽 두께, 거더와 보)를 도면으로 그려 확인한다
+  G = fresh(); const show = C.newProjectShowcase(G);
+  console.log("\n시연 시나리오(새 프로젝트):", show.join(" / "));
+  ok("시연 시나리오 끝 상태: 경고 없이 만들어짐", C.warnings(ORIG, G).filter(w => !w.includes("확인 필요")).length === 0, JSON.stringify(C.warnings(ORIG, G).filter(w => !w.includes("확인 필요"))));
   const out2 = C.exportChanges(ORIG, G, "김기준").map(c => Object.assign({}, c, { sheet: "NEW1T" })), d2 = C.diff(ORIG, G);
   ok("내보내기에 벽마다 두께가 들어감", out2.filter(c => c.action === "add_wall").map(c => c.params.thick).sort().join() === "250,250,250,250,300,300,300,300,300,300" && out2.filter(c => c.action === "add_wall").map(c => c.params.lw).sort().join() === "40,40,40,40,50,50,50,50,50,50" && out2.filter(c => c.action === "add_beam" && c.params.kind === "beam").map(c => c.params.lw).sort().join() === "18,18,18,25" && out2.find(c => c.action === "add_schedule").params.walls.length === 2);
   fs.writeFileSync(path.join(outDir, "changes_new_thick.json"), JSON.stringify(out2, null, 1));

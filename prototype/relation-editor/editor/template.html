@@ -905,6 +905,23 @@ function newProjectDemo(g) {
   recompute(g);
   return log;
 }
+function newProjectShowcase(g) {
+  // 시연 시나리오(새 프로젝트)의 끝 상태: 예시 계획안 + 벽 두께 + 코어 벽 두께 + 거더에 얹힌 보와 작은 보
+  const log = newProjectDemo(g), gid = (ax, v) => Object.values(g.grids).find(x => x.axis === ax && x.coord === v).id;
+  const ys = Object.values(g.grids).filter(x => x.axis === "y").sort((a, b) => a.coord - b.coord), xs = Object.values(g.grids).filter(x => x.axis === "x").sort((a, b) => a.coord - b.coord);
+  const on = k => g.edges.filter(e => e.wall && e.along === k).map(e => e.id);
+  setWallThick(g, 250); setWallThick(g, 300, on(ys[0].id).concat(on(ys[ys.length - 1].id)));
+  log.push("벽 두께: 앞뒤 외벽 300, 옆 외벽 250");
+  g.project.core_wall_thick = 250; g.cores.filter(c => c.kind === "elevator").forEach(c => { c.wall_thick = 150; });
+  log.push("코어 벽 두께: 계단실 250, 승강로 150");
+  const y0 = ys[0].coord, yb0 = y0 + 3000, xb0 = xs[2].coord + 1500;
+  addGridFree(g, "y", yb0); addGridFree(g, "x", xb0);
+  const yb = gid("y", yb0), xb = gid("x", xb0), beam = (a, b, along) => addEdge(g, { a: { xi: a[0], yj: a[1] }, b: { xi: b[0], yj: b[1] }, along }, "beam");
+  beam([xs[1].id, yb], [xs[2].id, yb], yb); beam([xs[2].id, yb], [xb, yb], yb); beam([xb, yb], [xs[3].id, yb], yb); beam([xb, ys[0].id], [xb, yb], xb);
+  recompute(g);
+  log.push(`거더 ${g.members.filter(m => m.edges[0].beam_kind === "girder").length}개, 보 ${g.members.filter(m => m.edges[0].beam_kind === "beam").length}개 (경간 ${[...new Set(g.members.filter(m => m.edges[0].beam_kind === "beam").map(m => m.span))].sort((a, b) => a - b).join(", ")})`);
+  return log;
+}
 function demoScenario(g) {
   if (!Object.keys(g.grids).length) return newProjectDemo(g);
   const log = [], N = () => idx(g.nodes), lab = id => N()[id].grid.join("-");
@@ -952,7 +969,7 @@ function demoScenario(g) {
   }
   return log;
 }
-if (typeof module !== "undefined") module.exports = { LW_DEFAULT, wallLw, beamLw, beamMembers, clampThick, coreWallThick, setWallThick, thickEditable, anchorOffset, siteSpan, dimObstacles, layoutDims, DIM_FIT, entryChoices, stairLead, coreEntry, coreWallFlags, coreDetail, detailDims, scheduleTables, CORE_TYPES, stairCalc, coreRect, addCore, deleteCore, setSite, addGridFree, addGridSeries, autoDims, projectInfo, polyArea, newProjectDemo, addDevice, deleteDevice, mepDiff, mepWarnings, addOpeningType, initModel, recompute, moveGridTo, addGrid, deleteGrid, intersections, candidateSegments, nodeAt, findEdge, addColumn, deleteColumn, addEdge, deleteEdgeKind, addOpening, deleteOpening, diff, warnings, exportChanges, gridLimits, demoScenario, clone, idx };
+if (typeof module !== "undefined") module.exports = { newProjectShowcase, LW_DEFAULT, wallLw, beamLw, beamMembers, clampThick, coreWallThick, setWallThick, thickEditable, anchorOffset, siteSpan, dimObstacles, layoutDims, DIM_FIT, entryChoices, stairLead, coreEntry, coreWallFlags, coreDetail, detailDims, scheduleTables, CORE_TYPES, stairCalc, coreRect, addCore, deleteCore, setSite, addGridFree, addGridSeries, autoDims, projectInfo, polyArea, newProjectDemo, addDevice, deleteDevice, mepDiff, mepWarnings, addOpeningType, initModel, recompute, moveGridTo, addGrid, deleteGrid, intersections, candidateSegments, nodeAt, findEdge, addColumn, deleteColumn, addEdge, deleteEdgeKind, addOpening, deleteOpening, diff, warnings, exportChanges, gridLimits, demoScenario, clone, idx };
 </script>
 
 <script id="ui">
@@ -1361,6 +1378,7 @@ if (typeof module !== "undefined") module.exports = { LW_DEFAULT, wallLw, beamLw
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: "application/json" })); a.download = `changes_${G.sheet}.json`; a.click(); URL.revokeObjectURL(a.href); };
   // 시연용: 주소 끝에 #demo 를 붙이면 예시 편집을 적용한 상태로, #mode=wall 처럼 붙이면 그 도구 모드로 시작
   if (location.hash.includes("demo")) { undo.push(JSON.stringify(G)); demoScenario(G); $("btnUndo").disabled = false; }
+  if (location.hash.includes("showcase") && ORIG.source === "blank") { undo.push(JSON.stringify(G)); newProjectShowcase(G); $("btnUndo").disabled = false; }      // 시연 시나리오의 끝 상태
   const mm = location.hash.match(/mode=(\w+)/); if (mm && HINTS[mm[1]]) mode = mm[1];
   fit(); render();
 
