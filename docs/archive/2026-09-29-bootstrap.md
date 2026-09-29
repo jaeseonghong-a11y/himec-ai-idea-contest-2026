@@ -14,3 +14,11 @@
 - 변경 파일: `README.md`, `docs/TEAM_WORKFLOW.md`, `CURRENT_STATE.md`
 - 실행한 명령: GitHub branch protection API 적용 및 조회
 - 결과: GitHub Pro 업그레이드 또는 공개 전환 필요 응답 확인. 같은 날 공개 전환과 Ruleset 적용으로 해결
+
+## Codex / 하이멕 DX·AI 전략 학습
+
+- 문제와 해결: 하이멕의 기존 디지털 기반을 모르면 중복 아이디어 위험 → 하이멕 저자 학술논문 원문 4쪽을 확보·검토
+- 변경 파일: `sources/official/SRC-004_HIMEC_DX_AI_strategy.pdf`, `sources/SRC-004_HIMEC_DX_AI_STRATEGY.md`, `docs/JUDGING_STRATEGY.md`
+- 실행한 명령: 공식 첨부 PDF 다운로드, PDF 정보 확인, 4쪽 PNG 렌더·전수 시각 검토, SHA-256 계산
+- 결과: HDP·HDB·HDT 구조와 AI의 설명가능성·책임성·데이터 품질 제약을 아이디어 평가 기준에 반영
+- 남은 위험: 내부 플랫폼의 현재 운영 범위·API·데이터 접근권한은 미확인
