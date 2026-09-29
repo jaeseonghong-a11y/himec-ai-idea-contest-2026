@@ -2,9 +2,9 @@
 
 ## 현재 상태 (2026-09-29, 팀장 AI)
 
-- 실시간 전사 후속 [#39](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/39): 24 kHz 로컬 녹음에서 명시적 체크박스 동의 후 OpenAI WebSocket으로만 음성을 전송하고, 확정 문장만 로컬 태그에 반영하는 개발 코드를 작성했다. 합성 이벤트·빌드 검증 중이며 실제 AutoCAD 마이크/API 계정 테스트는 아직 아니다. 기존 `v0.3.1-preview` 배포 ZIP은 바뀌지 않았다. `autocad-plugin/README_LIVE_PREVIEW_KO.md`에 사용법·한계를 기록한다.
+- 실시간 전사 후속 [#39](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/39): [PR #40](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/40)의 소스를 `main`에 병합하고 [v0.4.3-lab 실험판](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/releases/tag/v0.4.3-lab)을 예비 배포했다. 24 kHz 로컬 녹음에서 명시적 체크박스 동의 후 WebSocket 전송, 확정 문장만 로컬 태그에 반영하는 코드다. ChangeCore 테스트·독립 UI/합성 이벤트·Release 빌드·13파일 ZIP 및 원격 재다운로드 SHA-256 `46EA40520CA83DF66091018DA4F3ADF8B4DCFE17A1F4F092C449BA464555DBA9`를 확인했다. **실제 AutoCAD 마이크/API 연결과 사용자 계정의 429 원인은 미검증**이다. 기존 `v0.3.1-preview`는 그대로 두었고 설치는 아직 하지 않았다. 사용법은 `autocad-plugin/README_LIVE_PREVIEW_KO.md`를 따른다.
 
-- 플러그인 후속 개선 [#37](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/37): HTTP 429의 세부 원인을 비밀값 없이 분류하고, 팔레트 최소 크기를 완화하며, 전사문 식별자가 도면의 정확히 한 블록에 일치할 때만 검토 전 자동 연결하는 변경을 진행 중이다. `선택된 객체 확인`은 도면 선택 강조만 하고 파일을 수정하지 않는다. 녹음 중 실시간 음성 전사 연결은 아직 별도 구현·호스트 검증이 필요하며, 사용자 API 계정의 429 원인은 세부 응답/결제 상태를 확인하기 전까지 미확정이다.
+- 플러그인 후속 개선 [#37](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/37): [PR #38](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/38)의 HTTP 429 코드별 안내, 팔레트 최소 크기 완화, 단일 도면 식별자·명확한 상대 위치의 검토 전 자동 대상 제안, `선택된 객체 확인` 도면 강조를 `main`에 반영했다. 도면 이동은 별도 승인 전에는 일어나지 않는다. 실제 호스트 강조와 사용자 계정 429 원인은 여전히 미확정이다.
 
 - AutoCAD 2024 호환판: `archuni`에게 [#35](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/35)를 별도 배정했다. `work/archuni/r03`에서 2024 전용 .NET Framework 4.8 빌드·공존 번들·실제 호스트 검증을 진행한다. 기존 #18/PR #34는 유지한다. 2024 호환 기능은 아직 구현·검증되지 않았다.
 
@@ -22,7 +22,7 @@
 
 ## Recommended Next Step
 
-0. RT-01은 병합됐다. `docs/REALTIME_SPEECH_OBJECT_TAGGING_PLAN.md`에 따라 팀장 AI가 RT-02(실시간 전사 연결)와 RT-04(도면 후보·태그 검토 UI)를 서로 다른 새 작업 브랜치에 배정하고 `BRANCH_ASSIGNMENTS.md`에 기록한다. 팀원 AI에는 `prompts/TEAM_IMPLEMENT_REALTIME_TAGS.md`를 전달한다. RT-03(녹음·동의 UI)은 RT-02 병합 후 최신 `main`에서 시작한다. RT-02·RT-04에서는 실제 API 키·음성·도면을 Git에 넣지 않는다.
+0. `v0.4.3-lab`은 소스·합성 검사와 ZIP 배포까지만 끝났다. 현재 AutoCAD를 저장 후 완전히 종료한 다음 실험판을 설치하고 **합성 시험 도면**으로 팔레트 크기 조절, 단일/복수 객체 태그, 선택 강조, 24 kHz 녹음·재열기를 확인한다. 사용자 자신의 OpenAI API 계정에서 결제·한도를 확인한 뒤에만 시험용 음성을 명시적 동의로 전송하여 실제 429 코드와 실시간 전사를 확인한다. 오류가 나면 로컬 WAV와 구버전 백업을 보존하고 보고한다. 실제 키·음성·도면은 Git에 올리지 않는다.
 
 1. 기존 미저장 `Drawing1.dwg`의 시험 변경은 `autocad-plugin/dist/Drawing1-session-backup-20260929-155328.dwg`로 보존하고 다시 열어 두었다. 새 태그 기능은 합성 WAV와 `three_columns_mm.dxf`를 **삽입이 아닌 열기**로 연 시험 사본에서 객체 연결·이름 편집·재열기를 검사한다. 실제 프로젝트 도면은 사용하지 않는다. 키는 사용자가 가림 입력창에 직접 넣고 시험용 음성으로 API 전사를 별도 확인한다. 이후 후보/수동 선택·승인·블록 이동/UNDO도 별도 시험한다.
 2. 팀원에게 `prompts/ROUND_02_START.md`와 플러그인 설치가 필요하면 `prompts/TEAM_INSTALL_AUTOCAD_PLUGIN.md`를 전달한다. #17/#18/#20은 기존 계획대로 진행하고, 입력/출력 계약과 플러그인 연계는 통합 시 확인한다.
