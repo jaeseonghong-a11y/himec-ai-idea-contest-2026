@@ -1,0 +1,12 @@
+{
+  "_note": "B 단계 재현용 임시 합성 사이드카입니다. A(kijun-0108)의 prototype/sidecar/ 산출물이 나오면 교체합니다.",
+  "schema_version": 1,
+  "sheet_id": "A-101",
+  "source_dxf": "samples/A-101.dxf",
+  "source_pdf": "samples/A-101.pdf",
+  "unit": "mm",
+  "coordinate_system": "synthetic_pdf_points",
+  "objects": [
+    {"handle": "1A", "tag": "C1", "type": "INSERT", "layer": "COLUMN", "xy_mm": [1000, 2000], "pdf_page": 0, "pdf_rect_pt": [100, 120, 130, 150]}
+  ]
+}

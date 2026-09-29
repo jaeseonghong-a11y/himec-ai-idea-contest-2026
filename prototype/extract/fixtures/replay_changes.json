@@ -1,0 +1,57 @@
+{
+  "_note": "저장된 예시입니다. 실시간 AI 추론 결과가 아닙니다. mode=fixture_replay 로만 사용합니다.",
+  "items": [
+    {
+      "id": "CR-001",
+      "source": {
+        "quote": "A-101에서 C1 기둥을 위로 500 밀어주세요.",
+        "speaker": "synthetic-speaker-2",
+        "time": "00:00:12"
+      },
+      "sheet": "A-101",
+      "target": {"tag": "C1"},
+      "action": "move",
+      "params": {"dx_mm": 0, "dy_mm": 500},
+      "impacts": ["A-301", "E-201"]
+    },
+    {
+      "id": "CR-002",
+      "source": {
+        "quote": "A-301 단면도에서 B12 보 표기가 맞는지 같이 확인해 주세요.",
+        "speaker": "synthetic-speaker-1",
+        "time": "00:00:20"
+      },
+      "sheet": "A-301",
+      "target": {"tag": "B12"},
+      "action": "review",
+      "params": {},
+      "impacts": []
+    },
+    {
+      "id": "CR-003",
+      "source": {
+        "quote": "E-201 전기 간선 경로도 이 변경에 맞춰 재검토가 필요합니다.",
+        "speaker": "synthetic-speaker-2",
+        "time": "00:00:31"
+      },
+      "sheet": "E-201",
+      "target": {"tag": null},
+      "action": "review",
+      "params": {},
+      "impacts": []
+    },
+    {
+      "id": "CR-004",
+      "source": {
+        "quote": "그리고 저쪽 기둥도 좀 옮겨야 할 것 같은데요.",
+        "speaker": "synthetic-speaker-1",
+        "time": "00:00:44"
+      },
+      "sheet": null,
+      "target": {"tag": null},
+      "action": "move",
+      "params": {},
+      "impacts": []
+    }
+  ]
+}
