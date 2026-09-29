@@ -105,6 +105,40 @@ internal static class Program
                 ?? throw new InvalidOperationException("No generic 429 message."));
             if (noLeak.Contains("secret-value")) throw new InvalidOperationException("Untrusted error code leaked into UI.");
             describe.Invoke(null, [429, "{\"error\":\"malformed\"}"]);
+            var speechProvider = (ComboBox)(type.GetField("_speechProvider", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(panel)
+                ?? throw new InvalidOperationException("Speech provider selector not found."));
+            var reviewProvider = (ComboBox)(type.GetField("_reviewProvider", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(panel)
+                ?? throw new InvalidOperationException("Review provider selector not found."));
+            if (speechProvider.Items.Count != 2 || reviewProvider.Items.Count != 3 ||
+                speechProvider.Items[1]?.ToString() != "Gemini" || reviewProvider.Items[2]?.ToString() != "Claude")
+                throw new InvalidOperationException("Provider choices differ from supported capabilities.");
+            var geminiType = type.Assembly.GetType("Himec.AutoCad2026.GeminiLiveTranscriptionClient")
+                ?? throw new InvalidOperationException("Gemini live client not found.");
+            var setup = (string)geminiType.GetField("SetupMessage", BindingFlags.Static | BindingFlags.NonPublic)!.GetRawConstantValue()!;
+            using (var setupJson = System.Text.Json.JsonDocument.Parse(setup))
+                if (setupJson.RootElement.GetProperty("setup").GetProperty("model").GetString() != "models/gemini-3.5-transcribe-live")
+                    throw new InvalidOperationException("Gemini live model contract differs from documentation.");
+            var pcm = new byte[12];
+            for (short i = 0; i < 6; i++) BitConverter.TryWriteBytes(pcm.AsSpan(i * 2), i * 100);
+            var downsample = geminiType.GetMethod("Downsample24To16", BindingFlags.Static | BindingFlags.NonPublic)!;
+            var arguments = new object[] { pcm, Array.Empty<short>() };
+            var converted = (byte[])downsample.Invoke(null, arguments)!;
+            if (converted.Length != 8 || BitConverter.ToInt16(converted, 0) != 0 ||
+                BitConverter.ToInt16(converted, 2) != 150 || BitConverter.ToInt16(converted, 4) != 300)
+                throw new InvalidOperationException("Gemini PCM resampling failed.");
+            var geminiLive = Activator.CreateInstance(geminiType, nonPublic: true)!;
+            try
+            {
+                if ((bool)geminiType.GetMethod("QueuePcm")!.Invoke(geminiLive, [pcm])!)
+                    throw new InvalidOperationException("Gemini accepted PCM before consent and setup.");
+                CompletedTranscriptTurn? geminiTurn = null;
+                geminiType.GetEvent("Completed")!.AddEventHandler(geminiLive,
+                    new Action<CompletedTranscriptTurn>(turn => geminiTurn = turn));
+                geminiType.GetMethod("HandleEvent", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(geminiLive,
+                    ["{\"serverContent\":{\"inputTranscription\":{\"text\":\"C2 기둥\"}}}"]);
+                if (geminiTurn?.Text != "C2 기둥") throw new InvalidOperationException("Gemini final transcript not parsed.");
+            }
+            finally { ((IAsyncDisposable)geminiLive).DisposeAsync().AsTask().GetAwaiter().GetResult(); }
             var candidates = new List<RecordingObjectCandidate>
             {
                 new("synthetic.dxf", "A1", new[] { "C2" }, "BlockReference", "COLUMN"),

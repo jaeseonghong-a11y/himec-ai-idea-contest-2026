@@ -11,6 +11,9 @@
 | SRC-003 | 하이멕 업무·산업 맥락 | 주최사 공식 웹 | `SRC-003_HIMEC_CONTEXT.md`의 링크 | 2026-09-29 | 페이지별 확인 |
 | SRC-004 | 건축설비엔지니어링 DX 구축 사례 및 AI 전략 | 하이멕 저자 학술발표 논문 | `official/SRC-004_HIMEC_DX_AI_strategy.pdf`, [게시물](https://www.himec.co.kr/ko/info/technical/?gbn=viewok&gp=2&ix=427) | 2026-09-29 | 원본 확보·4쪽 전체 시각 검토 |
 | SRC-005 | OpenAI 녹음 파일 전사 API 규격 | 공급자 공식 개발 문서 | [Audio API Reference](https://platform.openai.com/docs/api-reference/audio/voice-consent-object?lang=curl), `SRC-005_OPENAI_TRANSCRIPTION.md` | 2026-09-29 | 엔드포인트·WAV·모델·JSON 텍스트 필드 확인 |
+| SRC-006 | OpenAI 실시간 전사 API | 공급자 공식 개발 문서 | [Realtime transcription](https://developers.openai.com/api/docs/guides/realtime-transcription), `SRC-006_OPENAI_REALTIME_TRANSCRIPTION.md` | 2026-09-29 | 세션·PCM·완료 이벤트 확인 |
+| SRC-007 | Gemini 파일·실시간 음성 전사 | 공급자 공식 개발 문서 | [Audio understanding](https://ai.google.dev/gemini-api/docs/generate-content/audio), [Live transcription](https://ai.google.dev/gemini-api/docs/live-api/live-transcribe) | 2026-09-29 | REST WAV 입력, WebSocket 16 kHz PCM/이벤트 확인·실계정 미검증 |
+| SRC-008 | Claude Messages API와 입력 형식 | 공급자 공식 개발 문서 | [Messages API](https://platform.claude.com/docs/en/api/messages/create), [Features overview](https://platform.claude.com/docs/en/build-with-claude/overview) | 2026-09-29 | 텍스트 검토 호출 확인·직접 WAV 전사 경로 없음·실계정 미검증 |
 
 ## 원본 무결성
 

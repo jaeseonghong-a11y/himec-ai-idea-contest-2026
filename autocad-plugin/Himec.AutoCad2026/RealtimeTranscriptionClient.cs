@@ -7,7 +7,7 @@ using Himec.ChangeCore;
 namespace Himec.AutoCad2026;
 
 // Never persists the key, PCM, or server messages. One ordered sender owns the socket.
-internal sealed class RealtimeTranscriptionClient : IAsyncDisposable
+internal sealed class RealtimeTranscriptionClient : ILiveTranscriptionClient
 {
     internal static readonly Uri Endpoint = new("wss://api.openai.com/v1/realtime?intent=transcription");
     internal const string SessionUpdateMessage = """
