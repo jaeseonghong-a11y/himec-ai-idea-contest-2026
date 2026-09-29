@@ -368,16 +368,17 @@ internal sealed class ReviewPanel : UserControl
             SetStatus("전사 취소: API 키가 없습니다. 전사문을 직접 입력할 수 있습니다.");
             return;
         }
-        if (MessageBox.Show($"{Path.GetFileName(path)} 파일을 {AiProviders.Name(provider)} 전사 API로 전송합니다. 동의하나요? 허가받지 않은 회의/고객 정보는 보내지 마세요.",
+        if (MessageBox.Show($"{Path.GetFileName(path)} 파일을 {AiProviders.Name(provider)} 전사 API로 전송합니다. Gemini가 일시적으로 응답하지 않으면 같은 제공자 내에서 최대 3회 시도할 수 있습니다. 동의하나요? 허가받지 않은 회의/고객 정보는 보내지 마세요.",
                 "외부 전송 확인", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
         _transcribe.Enabled = false;
         try
         {
             SetStatus("전사 중…");
-            _transcript.Text = await AiProviders.TranscribeAsync(provider, path, SessionKey(provider));
+            var result = await AiProviders.TranscribeAsync(provider, path, SessionKey(provider));
+            _transcript.Text = result.Text;
             var tagsSaved = ScanTranscript();
             SetStatus(tagsSaved
-                ? "전사 완료. 객체 언급 목록과 원문을 확인하세요."
+                ? $"전사 완료 ({result.Model}{(result.UsedFallback ? ", 대체 모델" : "")}). 객체 언급 목록과 원문을 확인하세요."
                 : "전사 완료, 태그 저장 실패. 상단 오류와 로컬 저장 경로를 확인하세요.");
         }
         catch (System.Exception ex)

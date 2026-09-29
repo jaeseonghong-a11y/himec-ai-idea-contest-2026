@@ -5,6 +5,7 @@ using System.Text.Json;
 namespace Himec.AutoCad2026;
 
 internal enum AiProvider { OpenAI, Gemini, Claude }
+internal sealed record TranscriptionResult(string Text, string Model, bool UsedFallback);
 
 internal static class AiProviders
 {
@@ -23,10 +24,11 @@ internal static class AiProviders
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
-    internal static async Task<string> TranscribeAsync(AiProvider provider, string wavPath, string? key)
+    internal static async Task<TranscriptionResult> TranscribeAsync(AiProvider provider, string wavPath, string? key)
     {
         if (provider == AiProvider.Claude) throw new NotSupportedException("Claude API는 WAV 음성 전사를 지원하지 않습니다. OpenAI 또는 Gemini를 선택하세요.");
-        if (provider == AiProvider.OpenAI) return await OpenAiTranscriber.TranscribeAsync(wavPath, key);
+        if (provider == AiProvider.OpenAI)
+            return new(await OpenAiTranscriber.TranscribeAsync(wavPath, key), "gpt-4o-mini-transcribe", false);
         key = RequireKey(provider, key);
         var file = new FileInfo(wavPath);
         if (!file.Exists || file.Length < 44 || file.Length > 10_000_000) throw new InvalidOperationException("WAV 파일은 10MB 이하의 유효한 파일이어야 합니다.");
@@ -37,10 +39,34 @@ internal static class AiProviders
                 new { inlineData = new { mimeType = "audio/wav", data = Convert.ToBase64String(await File.ReadAllBytesAsync(wavPath)) } }
             } } }
         };
-        using var request = JsonRequest("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent", body);
-        request.Headers.Add("x-goog-api-key", key);
-        using var json = await SendAsync(request, provider);
-        return GeminiText(json.RootElement);
+        return await SendGeminiTranscriptionAsync(Client, body, key);
+    }
+
+    internal static async Task<TranscriptionResult> SendGeminiTranscriptionAsync(
+        HttpClient client, object body, string key, Func<TimeSpan, Task>? pause = null)
+    {
+        pause ??= Task.Delay;
+        // A new request is created for every attempt; HttpRequestMessage cannot be resent.
+        // The final attempt uses another officially documented audio-input model if 503 persists.
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var model = attempt == 2 ? "gemini-3.5-flash" : "gemini-3.8-flash";
+            using var request = JsonRequest($"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent", body);
+            request.Headers.Add("x-goog-api-key", key);
+            using var response = await client.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                using var stream = await response.Content.ReadAsStreamAsync();
+                using var json = await JsonDocument.ParseAsync(stream);
+                return new(GeminiText(json.RootElement), model, attempt == 2);
+            }
+            var status = (int)response.StatusCode;
+            if (!IsTransientGeminiError(status) || attempt == 2)
+                throw new InvalidOperationException(DescribeHttpError(AiProvider.Gemini, status, attempt + 1));
+            // Bounded exponential backoff with jitter; do not loop indefinitely or retry auth failures.
+            await pause(TimeSpan.FromMilliseconds((1 << attempt) * 1000 + Random.Shared.Next(0, 250)));
+        }
+        throw new InvalidOperationException("Gemini 전사가 완료되지 않았습니다.");
     }
 
     internal static async Task<string> ReviewAsync(AiProvider provider, string transcript, string? key)
@@ -93,9 +119,27 @@ internal static class AiProviders
         using var response = await Client.SendAsync(request);
         // Do not echo provider responses: they can contain user data or credentials.
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"{Name(provider)} API 오류: HTTP {(int)response.StatusCode}. 계정 결제·한도·모델 접근 권한과 네트워크를 확인하세요.");
+            throw new InvalidOperationException(DescribeHttpError(provider, (int)response.StatusCode));
         using var stream = await response.Content.ReadAsStreamAsync();
         return await JsonDocument.ParseAsync(stream);
+    }
+
+    internal static bool IsTransientGeminiError(int status) => status is 502 or 503 or 504;
+
+    internal static string DescribeHttpError(AiProvider provider, int status, int attempts = 1)
+    {
+        var prefix = $"{Name(provider)} API 오류: HTTP {status}. ";
+        if (provider == AiProvider.Gemini)
+            return prefix + (status switch
+            {
+                503 or 502 or 504 => $"Google 서비스가 일시적으로 응답하지 않거나 과부하 상태입니다. {attempts}회 시도했으며 계정 권한 오류로 단정할 수 없습니다. 잠시 후 다시 시도하거나 OpenAI 전사를 선택하세요. 녹음 파일은 로컬에 남아 있습니다.",
+                429 => "요청 속도 또는 사용량 한도에 도달했습니다. 잠시 후 다시 시도하고 AI Studio 한도를 확인하세요.",
+                401 or 403 => "API 키 또는 프로젝트 접근 권한을 확인하세요.",
+                400 => "요청 형식 또는 WAV 파일을 확인하세요.",
+                404 => "선택된 모델을 사용할 수 없습니다. 모델 접근 권한과 사용 가능 모델을 확인하세요.",
+                _ => "일시적인 서비스 오류일 수 있습니다. 계속되면 AI Studio 서비스 상태와 요청 형식을 확인하세요."
+            });
+        return prefix + "계정 상태·한도·모델 접근 권한과 네트워크를 확인하세요.";
     }
 
     private static string GeminiText(JsonElement root)
