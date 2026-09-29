@@ -26,7 +26,7 @@ dotnet build autocad-plugin/Himec.AutoCad2026/Himec.AutoCad2026.csproj -c Releas
 `package.ps1`은 기존 버전을 덮어쓰지 않는다. 예시는 `dist/0.2.1/Himec.ChangeLoop.bundle`을 만든다. 빌드 결과에 Autodesk DLL은 포함하지 않고 NAudio 및 프로젝트 DLL만 포함한다.
 새 버전 패키지마다 Autodesk 권장대로 `ProductCode`를 새 GUID로 만들고 `UpgradeCode`는 유지한다. 같은 버전을 다시 만들 때도 결과 디렉터리가 이미 있으면 중단한다.
 
-UI 레이아웃은 AutoCAD 어두운 작업 화면과 맞춘 4단계 카드, 상단 고정 상태 메시지, 구분된 보조/주요/실행 버튼으로 구성한다. AutoCAD를 재시작하지 않고 레이아웃만 확인할 때는 `dotnet run --project autocad-plugin/Himec.PalettePreview/Himec.PalettePreview.csproj -c Release -- autocad-plugin/dist/palette-preview.png`를 사용한다. 미리보기는 AutoCAD 명령을 실행하지 않는다.
+UI 레이아웃은 AutoCAD 어두운 작업 화면과 맞춘 4단계 카드, 상단 고정 상태 메시지, 구분된 보조/주요/실행 버튼으로 구성한다. AutoCAD를 재시작하지 않고 레이아웃만 확인할 때는 `dotnet run --project autocad-plugin/Himec.PalettePreview/Himec.PalettePreview.csproj -c Release -- autocad-plugin/dist/palette-preview.png`를 사용한다. 미리보기는 AutoCAD 명령을 실행하지 않는다. 기존 WAV 선택과 오류 상태 표시는 `dotnet run --project autocad-plugin/Himec.PalettePreview/Himec.PalettePreview.csproj -c Release -- --self-test`로 합성 WAV를 사용해 검사한다.
 
 ## AutoCAD에서 로드
 
@@ -39,7 +39,7 @@ UI 레이아웃은 AutoCAD 어두운 작업 화면과 맞춘 4단계 카드, 상
 
 - 여러 층/줄/공간에 걸친 “왼쪽 세 번째”의 정확한 범위 해석, 도면 하이라이트, 대화형 모호성 질문, 전체 회의에서 여러 지시 분리, LLM 자연어 추출, 다른 도면 연쇄 수정, PDF 주석, MCP 연동.
 - AutoCAD 2024 호환 빌드, 자동 업데이트. 현재는 검증 후 수동으로 실행하는 사용자별 설치 스크립트만 있다.
-- 사용자가 AutoCAD 2026에서 v0.1.2 로드·팔레트·수동 문장 X 0/Y +300 mm 분석을 확인했다. 녹음 WAV 파일 3개는 메타데이터(길이·형식·에너지)만 확인했다. 마이크 음성 품질·API 전사·도면 변경은 별도 검증이다. 새 UI·키 입력·기존 WAV 선택 기능이 포함된 v0.2.1은 AutoCAD 재시작 후 호스트 검증이 필요하다.
+- 사용자가 AutoCAD 2026에서 v0.1.2 로드·팔레트·수동 문장 X 0/Y +300 mm 분석을 확인했다. 녹음 WAV 파일 3개는 메타데이터(길이·형식·에너지)만 확인했다. v0.2.1 사용자별 설치·AutoCAD 재시작·새 UI 표시도 확인했다. 마이크 음성 품질·실제 API 전사·플러그인 도면 변경/UNDO는 별도 검증이다.
 
 ## 배포·업데이트
 
