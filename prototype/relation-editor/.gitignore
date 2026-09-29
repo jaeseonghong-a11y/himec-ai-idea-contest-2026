@@ -1,0 +1,7 @@
+# 실제 도면과 거기서 나온 결과물은 저장소에 올리지 않는다 (따로 공유)
+real sample/
+real_dxf/
+real_pdf/
+out/
+changes_*.json
+__pycache__/
