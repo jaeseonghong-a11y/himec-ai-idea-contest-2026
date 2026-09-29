@@ -14,6 +14,7 @@ Git clone, fetch, checkout, pull, commit, push, PR 생성은 팀원 AI가 처리
 
 - 현재 Round 02 작업 시작: `prompts/ROUND_02_START.md` (세 팀원 공통, 로그인 계정으로 담당 자동 선택)
 - AutoCAD 2026 플러그인을 자기 PC에 설치/업데이트할 때: `prompts/TEAM_INSTALL_AUTOCAD_PLUGIN.md` (담당 작업 브랜치는 바꾸지 않음)
+- `archuni`가 AutoCAD 2024 호환판을 개발할 때: `prompts/TEAM_AUTOCAD_2024_START.md` (#35, `work/archuni/r03`; 기존 r02 PR과 별도 작업 복사본)
 
 - 처음 참여할 때: `prompts/TEAM_FIRST_START.md`
 - 작업을 끝내고 병합 요청할 때: `prompts/TEAM_REQUEST_MERGE.md`
