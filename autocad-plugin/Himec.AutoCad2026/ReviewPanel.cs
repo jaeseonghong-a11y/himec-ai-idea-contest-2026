@@ -258,7 +258,12 @@ internal sealed class ReviewPanel : UserControl
         };
         client.Failed += error =>
         {
-            if (!IsDisposed) BeginInvoke(() => { _liveState.Text = "실시간 전사: 연결 오류 · 로컬 녹음만"; SetStatus(error); });
+            if (!IsDisposed) BeginInvoke(async () =>
+            {
+                _liveState.Text = "실시간 전사: 연결 오류 · 로컬 녹음만";
+                SetStatus(error);
+                if (ReferenceEquals(_liveClient, client)) await StopLiveAsync();
+            });
         };
         try
         {
