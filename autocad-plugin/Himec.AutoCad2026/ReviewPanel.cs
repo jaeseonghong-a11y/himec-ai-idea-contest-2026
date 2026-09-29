@@ -73,13 +73,13 @@ internal sealed class ReviewPanel : UserControl
             new Label { Text = "전사문  |  직접 수정·입력 가능", Height = 21 }, _transcript);
         var cardTags = CreateCard("02  녹음 객체 태그", "녹음 중 직접 찍기 · 전사 후 언급 검토/수정", _tagReview);
         var cardParse = CreateCard("03  변경 지시 확인", "이동량을 읽고, 불명확한 대상은 보류합니다.", _analyze, _summary);
-        var cardTarget = CreateCard("04  도면 대상 지정", "후보는 참고용 · 최종 대상은 직접 클릭", _suggest, _pick, _target);
+        var cardTarget = CreateCard("04  도면 대상 지정", "단일 식별자는 자동 제안 · 애매하면 직접 클릭", _suggest, _pick, _target);
         var cardApply = CreateCard("05  검토 후 반영", "승인 전에는 도면을 수정하지 않습니다.", _approve, _execute);
         var cards = new[] { cardInput, cardTags, cardParse, cardTarget, cardApply };
         foreach (var card in cards) layout.Controls.Add(card);
         layout.SizeChanged += (_, _) =>
         {
-            var cardWidth = Math.Max(320, layout.ClientSize.Width - layout.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth - 3);
+            var cardWidth = Math.Max(260, layout.ClientSize.Width - layout.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth - 3);
             foreach (var card in cards)
             {
                 card.Width = cardWidth;
@@ -118,7 +118,7 @@ internal sealed class ReviewPanel : UserControl
         _approve.Click += (_, _) => Approve();
         _execute.Click += (_, _) => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_APPLY ", true, false, false);
         _tagReview.StatusChanged += SetStatus;
-        _tagReview.ScanRequested += () => { _tagReview.AddTranscriptMentions(_transcript.Text); };
+        _tagReview.ScanRequested += () => ScanTranscript();
         _tagReview.PickRequested += () => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_TAG_PICK ", true, false, false);
     }
 
@@ -219,7 +219,7 @@ internal sealed class ReviewPanel : UserControl
         {
             SetStatus("전사 중…");
             _transcript.Text = await OpenAiTranscriber.TranscribeAsync(path, _sessionApiKey);
-            var tagsSaved = _tagReview.AddTranscriptMentions(_transcript.Text);
+            var tagsSaved = ScanTranscript();
             SetStatus(tagsSaved
                 ? "전사 완료. 객체 언급 목록과 원문을 확인하세요."
                 : "전사 완료, 태그 저장 실패. 상단 오류와 로컬 저장 경로를 확인하세요.");
@@ -230,6 +230,18 @@ internal sealed class ReviewPanel : UserControl
             MessageBox.Show(ex.Message, "전사 실패 — 녹음 파일은 로컬에 남아 있습니다", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally { _transcribe.Enabled = true; }
+    }
+
+    private bool ScanTranscript()
+    {
+        var doc = AcadApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return _tagReview.AddTranscriptMentions(_transcript.Text);
+        try { return _tagReview.AddTranscriptWithCandidates(_transcript.Text, doc.Name, PluginCommands.GetDrawingCandidates()); }
+        catch (System.Exception ex)
+        {
+            SetStatus("도면 후보 검색 실패: " + ex.Message + ". 직접 객체를 지정할 수 있습니다.");
+            return _tagReview.AddTranscriptMentions(_transcript.Text);
+        }
     }
 
     private void ChooseAudio()
@@ -333,9 +345,17 @@ internal sealed class ReviewPanel : UserControl
         }
         PluginCommands.CurrentInstruction = change;
         PluginCommands.SelectedObjectId = Autodesk.AutoCAD.DatabaseServices.ObjectId.Null;
-        _summary.Text = $"제안: 블록 이동 X {change!.DxMm:+0.##;-0.##;0} mm / Y {change.DyMm:+0.##;-0.##;0} mm\nWCS 좌표 기준 · 자동 대상 확정 안 함 · 로컬 규칙 해석";
-        _target.Text = "대상 미지정 — 도면에서 직접 선택하세요.";
-        SetStatus(reason);
+        _summary.Text = $"제안: 블록 이동 X {change!.DxMm:+0.##;-0.##;0} mm / Y {change.DyMm:+0.##;-0.##;0} mm\nWCS 좌표 기준 · 로컬 규칙 해석 · 실행 전 승인 필수";
+        try
+        {
+            _target.Text = PluginCommands.TrySuggestMoveTarget(change);
+            SetStatus(_target.Text);
+        }
+        catch (System.Exception ex)
+        {
+            _target.Text = "대상 미지정 — 도면에서 직접 선택하세요.";
+            SetStatus("자동 후보 검색 실패: " + ex.Message);
+        }
     }
 
     private void Approve()

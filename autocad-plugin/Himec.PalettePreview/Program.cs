@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.Loader;
 using System.Windows.Forms;
 using NAudio.Wave;
+using Himec.ChangeCore;
 
 namespace Himec.PalettePreview;
 
@@ -92,6 +93,31 @@ internal static class Program
             if (Convert.ToString(grid.Rows[0].Cells[2].Value) != "지정 완료")
                 throw new InvalidOperationException("Tag-object link was not shown.");
             if (!File.Exists(sessionPath)) throw new InvalidOperationException("Tag session was not saved.");
+            var transcriber = type.Assembly.GetType("Himec.AutoCad2026.OpenAiTranscriber")
+                ?? throw new InvalidOperationException("Transcriber not found.");
+            var describe = transcriber.GetMethod("DescribeError", BindingFlags.Static | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Error mapper not found.");
+            var quota = (string)(describe.Invoke(null, [429, "{\"error\":{\"code\":\"credit_balance_exhausted\"}}"])
+                ?? throw new InvalidOperationException("No quota message."));
+            if (!quota.Contains("잔액") || quota.Contains("파일 형식"))
+                throw new InvalidOperationException("429 quota reason was not distinguished from file format.");
+            var noLeak = (string)(describe.Invoke(null, [429, "{\"error\":{\"code\":\"secret-value\"}}"])
+                ?? throw new InvalidOperationException("No generic 429 message."));
+            if (noLeak.Contains("secret-value")) throw new InvalidOperationException("Untrusted error code leaked into UI.");
+            var candidates = new List<RecordingObjectCandidate>
+            {
+                new("synthetic.dxf", "A1", new[] { "C2" }, "BlockReference", "COLUMN"),
+                new("synthetic.dxf", "A2", new[] { "B12" }, "BlockReference", "BEAM"),
+                new("synthetic.dxf", "A3", new[] { "B12" }, "BlockReference", "BEAM")
+            };
+            tagType.GetMethod("AddTranscriptWithCandidates")!.Invoke(tagPanel,
+                ["C2 기둥을 옮기자. B12도 확인하자.", "synthetic.dxf", candidates]);
+            if (!grid.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[1].Value) == "C2" &&
+                    Convert.ToString(r.Cells[2].Value)!.Contains("제안 연결")))
+                throw new InvalidOperationException("Unique drawing identifier did not create a proposed link.");
+            if (!grid.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[1].Value) == "B12" &&
+                    Convert.ToString(r.Cells[2].Value) == "선택 필요"))
+                throw new InvalidOperationException("Ambiguous drawing identifier was auto-linked.");
             Console.WriteLine("Palette audio, error, transcript-tag list, object-link and local-save checks passed");
         }
         finally
