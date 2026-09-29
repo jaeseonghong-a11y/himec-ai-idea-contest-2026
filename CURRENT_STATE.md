@@ -10,11 +10,12 @@
 - 제품 검증: C 단계의 계약 기반 합성 DXF 단위 테스트 5건 통과(Python 3.14.4, ezdxf 1.4.4). A/B 실제 산출물과의 통합, 실제 API 호출, AutoCAD에서 DXF 열기, PDF↔DWG 대응은 각각 별도로 확인해야 한다.
 - 제출 문안: `docs/ATTACHMENT_4_DRAFT.md`에 붙임 4 내용 초안을 작성했다. 공식 DOCX 양식 반영·팀 정보·실제 데모 결과 갱신 전이며 제출 완료가 아니다.
 - 사용자 추가 요청: AutoCAD 2026 플러그인을 우선 개발(#25). v0.1.2 `NETLOAD`·팔레트·예문 X 0 mm / Y +300 mm 화면 확인. 녹음 WAV 3개가 로컬에서 생성됐고 형식·길이·비영 신호 확인(내용 미청취). API 키가 로컬 환경에 없어 외부 전사는 호출 전 막혔을 가능성이 높고, 구버전 오류 상태란이 화면 아래에 있었다. v0.2.1에 이번 실행 전용 키 입력·기존 WAV 선택·상단 오류·어두운 4단계 UI·기둥 선택 안전장치를 반영했고, 사용자별 설치 후 AutoCAD 재시작/새 UI 표시까지 확인했다. API 호출과 플러그인 승인·DWG 이동/UNDO는 미검증이다. 팀원 #17/#18/#20 작업은 유지한다.
+- 공동 개발 배포: 사용자 결정에 따라 실제 전사/편집의 최종 검증 전에 v0.2.1-preview를 팀 공동 개발용으로 `main` 및 GitHub Release에 공유한다. 설치·업데이트·개별 API 키 안내는 `docs/AUTOCAD_PLUGIN_TEAM_INSTALL.md`, 팀원 AI 붙여넣기 문장은 `prompts/TEAM_INSTALL_AUTOCAD_PLUGIN.md`를 따른다. 이는 기능 완성/제출 검증을 의미하지 않는다.
 
 ## Recommended Next Step
 
 1. 기존 미저장 `Drawing1.dwg`의 시험 변경은 `autocad-plugin/dist/Drawing1-session-backup-20260929-155328.dwg`로 보존하고 다시 열어 두었다. `three_columns_mm.dxf`를 **삽입이 아닌 열기**로 연 별도 시험 사본에서 후보/수동 선택·승인·블록 이동/UNDO를 시험한다. 실제 프로젝트 도면은 사용하지 않는다. 키는 사용자가 가림 입력창에 직접 넣고 시험용 음성으로 API 전사를 별도 확인한다.
-2. 팀원에게 `prompts/ROUND_02_START.md`를 전달한다. #17/#18/#20은 기존 계획대로 진행하고, 입력/출력 계약과 플러그인 연계는 통합 시 확인한다.
+2. 팀원에게 `prompts/ROUND_02_START.md`와 플러그인 설치가 필요하면 `prompts/TEAM_INSTALL_AUTOCAD_PLUGIN.md`를 전달한다. #17/#18/#20은 기존 계획대로 진행하고, 입력/출력 계약과 플러그인 연계는 통합 시 확인한다.
 3. 팀장 AI가 팀원 PR을 통합해 #19를 재검증하고, 출품 문안에는 실제 구현·검증된 부분만 반영한다.
 
 ## 최신 체크포인트
