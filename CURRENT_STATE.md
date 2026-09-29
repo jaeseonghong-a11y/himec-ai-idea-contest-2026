@@ -10,7 +10,7 @@
 - 제품 검증: C 단계의 계약 기반 합성 DXF 단위 테스트 5건 통과(Python 3.14.4, ezdxf 1.4.4). A/B 실제 산출물과의 통합, 실제 API 호출, AutoCAD에서 DXF 열기, PDF↔DWG 대응은 각각 별도로 확인해야 한다.
 - 제출 문안: `docs/ATTACHMENT_4_DRAFT.md`에 붙임 4 내용 초안을 작성했다. 공식 DOCX 양식 반영·팀 정보·실제 데모 결과 갱신 전이며 제출 완료가 아니다.
 - 사용자 추가 요청: AutoCAD 2026 플러그인을 우선 개발(#25). v0.1.2 `NETLOAD`·팔레트·예문 X 0 mm / Y +300 mm 화면 확인. 녹음 WAV 3개가 로컬에서 생성됐고 형식·길이·비영 신호 확인(내용 미청취). API 키가 로컬 환경에 없어 외부 전사는 호출 전 막혔을 가능성이 높고, 구버전 오류 상태란이 화면 아래에 있었다. v0.2.1에 이번 실행 전용 키 입력·기존 WAV 선택·상단 오류·어두운 4단계 UI·기둥 선택 안전장치를 반영했고, 사용자별 설치 후 AutoCAD 재시작/새 UI 표시까지 확인했다. API 호출과 플러그인 승인·DWG 이동/UNDO는 미검증이다. 팀원 #17/#18/#20 작업은 유지한다.
-- 공동 개발 배포: 사용자 결정에 따라 실제 전사/편집의 최종 검증 전에 v0.2.1-preview 소스를 PR #26의 squash merge `313ddf2`로 `main`에 공유했다. 팀 배포 ZIP에는 설치 스크립트와 `README_INSTALL_KO.md`를 포함한다. 설치·업데이트·개별 API 키 안내는 `docs/AUTOCAD_PLUGIN_TEAM_INSTALL.md`, 팀원 AI 붙여넣기 문장은 `prompts/TEAM_INSTALL_AUTOCAD_PLUGIN.md`를 따른다. 이는 기능 완성/제출 검증을 의미하지 않는다.
+- 공동 개발 배포: 사용자 결정에 따라 실제 전사/편집의 최종 검증 전에 v0.2.1-preview 소스를 PR #26/#27의 squash merge로 `main`에 공유했다. [GitHub Release](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/releases/tag/v0.2.1-preview)의 팀 배포 ZIP에는 설치 스크립트와 `README_INSTALL_KO.md`가 들어 있다. 원격 Release 파일을 다시 내려받아 SHA-256 일치를 확인했다. 설치·업데이트·개별 API 키 안내는 `docs/AUTOCAD_PLUGIN_TEAM_INSTALL.md`, 팀원 AI 붙여넣기 문장은 `prompts/TEAM_INSTALL_AUTOCAD_PLUGIN.md`를 따른다. 이는 기능 완성/제출 검증을 의미하지 않는다.
 
 ## Recommended Next Step
 
@@ -25,7 +25,7 @@
 - 변경: AutoCAD 2026 .NET 플러그인, 녹음/전사 팔레트, 로컬 규칙 이동 추출, 기둥 후보 추천(제한적), 수동 선택, 승인 후 블록 이동, 번들 패키징 코드 작성.
 - 검증: `.NET 8` 파서·대상 선택 검사 10건과 팔레트 WAV 선택/오류 상태 검사 통과, 호스트 빌드 오류 0개, v0.2.1 번들 필수 DLL 포함. v0.1.2에서 사용자 제공 `HIMEC` 팔레트·예문 X 0/Y +300 mm 화면 확인. v0.2.1 사용자별 설치·AutoCAD 재시작·새 UI/키 미설정 안내 실제 호스트 화면 확인(`docs/assets/autocad-palette-v0.2.1-host.png`). AutoCAD MCP `health` 및 합성 DXF의 기둥 블록 3개/mm 단위 감사 성공. MCP 쓰기 1회는 IPC 시간 초과로 실패했고 감사 결과 이동 없음 확인·복구 수행. 별도 합성 도면 복사본에서 AutoCAD COM 블록 이동 Y 0→300→0 확인 후 저장 없이 닫음(플러그인 실행 검증 아님). WAV 3개 메타데이터, 420×640/1200 독립 UI 미리보기, 사용자별 설치 스크립트의 시험 경로 설치·백업 확인. `WindowsBase` 버전 충돌 빌드 경고 1개는 남아 있다.
 - 미검증: 녹음 장치 음성 품질·OpenAI 실제 전사·플러그인 승인 후 DWG 편집/UNDO, AutoCAD 2024. 새 UI 표시만으로 전체 기능을 검증했다고 보지 않는다.
-- 팀 배포: v0.2.1 번들을 포함한 ZIP 12파일·266636바이트를 생성했다. ZIP 안에 한국어 설치 README, 설치 스크립트, 매니페스트, 필수 DLL이 있는지 확인했고 SHA-256은 `114AB5A9C77A0A9CC588D110F6858BA8ED2373F08BC8FFA1E9AE2E4ACB493423`이다. GitHub Release 업로드·원격 다운로드 검증은 별도 완료 전까지 미확인이다.
+- 팀 배포: v0.2.1 번들을 포함한 ZIP 12파일·266636바이트를 생성했다. ZIP 안에 한국어 설치 README, 설치 스크립트, 매니페스트, 필수 DLL이 있는지 확인했고 SHA-256은 `114AB5A9C77A0A9CC588D110F6858BA8ED2373F08BC8FFA1E9AE2E4ACB493423`이다. ZIP 압축 해제 후 README·DLL을 원본과 해시 대조했고, GitHub Release에 업로드한 파일을 다시 다운로드해 ZIP 해시 일치도 확인했다.
 
 ### 2026-09-29 / 붙임 4 내용 초안
 
