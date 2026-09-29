@@ -20,6 +20,10 @@ internal sealed class ReviewPanel : UserControl
     private readonly Button _stop = new() { Text = "■ 녹음 중지", Width = 170, Enabled = false };
     private readonly Button _chooseAudio = new() { Text = "이미 녹음한 WAV 선택", Width = 340 };
     private readonly Button _setApiKey = new() { Text = "전사 API 키 입력 (이번 실행에만 사용)", Width = 340 };
+    private readonly ComboBox _speechProvider = new() { Width = 340, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox _reviewProvider = new() { Width = 340, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly Button _aiReview = new() { Text = "AI로 변경 지시 검토 (도면 수정 안 함)", Width = 340 };
+    private readonly TextBox _aiReviewResult = new() { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Width = 340, Height = 105, Text = "AI 검토 결과는 참고용입니다. 도면 실행은 별도 승인해야 합니다." };
     private readonly Button _transcribe = new() { Text = "녹음 전사(API 호출)", Width = 340 };
     private readonly Button _liveStart = new() { Text = "실시간 전사 시작", Width = 170, Enabled = false };
     private readonly Button _liveStop = new() { Text = "실시간 전사 중지", Width = 170, Enabled = false };
@@ -31,9 +35,9 @@ internal sealed class ReviewPanel : UserControl
     private readonly Button _approve = new() { Text = "지시 승인", Width = 340 };
     private readonly Button _execute = new() { Text = "승인된 변경 실행", Width = 340 };
     private readonly RecordingTagPanel _tagReview = new();
-    private string? _sessionApiKey;
+    private readonly Dictionary<AiProvider, string> _sessionApiKeys = new();
     private string? _selectedAudioPath;
-    private RealtimeTranscriptionClient? _liveClient;
+    private ILiveTranscriptionClient? _liveClient;
     private Action<byte[]>? _livePcmHandler;
     private string? _liveDrawing;
     private bool _stoppingRecording;
@@ -41,6 +45,10 @@ internal sealed class ReviewPanel : UserControl
 
     public ReviewPanel()
     {
+        _speechProvider.Items.AddRange(["OpenAI", "Gemini"]);
+        _speechProvider.SelectedIndex = 0;
+        _reviewProvider.Items.AddRange(["OpenAI", "Gemini", "Claude"]);
+        _reviewProvider.SelectedIndex = 0;
         Dock = DockStyle.Fill;
         BackColor = PaletteTheme.Canvas;
         ForeColor = PaletteTheme.Text;
@@ -80,10 +88,12 @@ internal sealed class ReviewPanel : UserControl
         liveRow.Controls.Add(_liveStart);
         liveRow.Controls.Add(_liveStop);
         var cardInput = CreateCard("01  회의 입력", "녹음은 로컬 저장 · 전사는 별도 동의 후 전송", row, _chooseAudio, _recordingInfo,
+            new Label { Text = "음성 전사 제공자  |  OpenAI 또는 Gemini", Height = 21 }, _speechProvider,
             _keyState, _setApiKey, liveRow, _liveState, _livePartial, _transcribe,
             new Label { Text = "전사문  |  직접 수정·입력 가능", Height = 21 }, _transcript);
         var cardTags = CreateCard("02  녹음 객체 태그", "녹음 중 직접 찍기 · 전사 후 언급 검토/수정", _tagReview);
-        var cardParse = CreateCard("03  변경 지시 확인", "이동량을 읽고, 불명확한 대상은 보류합니다.", _analyze, _summary);
+        var cardParse = CreateCard("03  변경 지시 확인", "AI 검토는 참고용 · 실행은 로컬 규칙과 사람 승인", _reviewProvider,
+            _aiReview, _aiReviewResult, _analyze, _summary);
         var cardTarget = CreateCard("04  도면 대상 지정", "단일 식별자는 자동 제안 · 애매하면 직접 클릭", _suggest, _pick, _target);
         var cardApply = CreateCard("05  검토 후 반영", "승인 전에는 도면을 수정하지 않습니다.", _approve, _execute);
         var cards = new[] { cardInput, cardTags, cardParse, cardTarget, cardApply };
@@ -108,7 +118,7 @@ internal sealed class ReviewPanel : UserControl
         shell.Controls.Add(layout, 0, 2);
         Controls.Add(shell);
 
-        foreach (var button in new[] { _record, _stop, _chooseAudio, _setApiKey, _liveStart, _liveStop, _transcribe, _analyze, _suggest, _pick, _approve, _execute })
+        foreach (var button in new[] { _record, _stop, _chooseAudio, _setApiKey, _liveStart, _liveStop, _transcribe, _aiReview, _analyze, _suggest, _pick, _approve, _execute })
             PaletteTheme.Button(button, primary: button == _analyze || button == _pick, caution: button == _execute);
         foreach (var label in new[] { _keyState, _recordingInfo, _liveState, _livePartial, _summary, _target }) PaletteTheme.Label(label);
         _summary.ForeColor = PaletteTheme.Text;
@@ -118,6 +128,11 @@ internal sealed class ReviewPanel : UserControl
         _transcript.BorderStyle = BorderStyle.FixedSingle;
         _transcript.Font = new Font("Segoe UI", 10F);
         _transcript.Margin = new Padding(0, 4, 0, 4);
+        foreach (Control box in new Control[] { _aiReviewResult, _speechProvider, _reviewProvider })
+        {
+            box.BackColor = PaletteTheme.Input;
+            box.ForeColor = PaletteTheme.Text;
+        }
         UpdateKeyState();
 
         _record.Click += (_, _) => StartRecording();
@@ -128,6 +143,10 @@ internal sealed class ReviewPanel : UserControl
         };
         _chooseAudio.Click += (_, _) => ChooseAudio();
         _setApiKey.Click += (_, _) => PromptForApiKey();
+        _speechProvider.SelectedIndexChanged += (_, _) => UpdateKeyState();
+        _reviewProvider.SelectedIndexChanged += (_, _) => UpdateKeyState();
+        _transcript.TextChanged += (_, _) => _aiReviewResult.Text = "전사문이 바뀌었습니다. AI 검토가 필요하면 다시 실행하세요.";
+        _aiReview.Click += async (_, _) => await ReviewWithAiAsync();
         _transcribe.Click += async (_, _) => await TranscribeAsync();
         _liveStart.Click += async (_, _) => await StartLiveAsync();
         _liveStop.Click += async (_, _) => await StopLiveAsync();
@@ -229,11 +248,13 @@ internal sealed class ReviewPanel : UserControl
     private async Task StartLiveAsync()
     {
         if (!_recorder.IsRecording || _liveClient is not null) return;
-        if (string.IsNullOrWhiteSpace(_sessionApiKey) && !OpenAiTranscriber.HasEnvironmentKey && !PromptForApiKey()) return;
-        if (!ConfirmLiveUpload()) { SetStatus("실시간 전사 취소 · 로컬 녹음은 계속됩니다."); return; }
-        var key = _sessionApiKey ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-        var client = new RealtimeTranscriptionClient();
+        var provider = SpeechProvider;
+        if (AiProviders.ResolveKey(provider, SessionKey(provider)) is null && !PromptForApiKey(provider)) return;
+        if (!ConfirmLiveUpload(provider)) { SetStatus("실시간 전사 취소 · 로컬 녹음은 계속됩니다."); return; }
+        var key = AiProviders.ResolveKey(provider, SessionKey(provider));
+        ILiveTranscriptionClient client = provider == AiProvider.Gemini ? new GeminiLiveTranscriptionClient() : new RealtimeTranscriptionClient();
         _liveStart.Enabled = false;
+        _speechProvider.Enabled = false;
         _liveState.Text = "실시간 전사: 연결 중…";
         client.Partial += delta =>
         {
@@ -272,6 +293,7 @@ internal sealed class ReviewPanel : UserControl
             {
                 await client.StopAsync();
                 await client.DisposeAsync();
+                _speechProvider.Enabled = true;
                 return;
             }
             _liveDrawing = AcadApp.DocumentManager.MdiActiveDocument?.Name;
@@ -280,15 +302,16 @@ internal sealed class ReviewPanel : UserControl
             _recorder.PcmAvailable += _livePcmHandler;
             _liveStop.Enabled = true;
             _liveState.Text = "실시간 전사: 전송 중 · 4초마다 문장 확정";
-            SetStatus("동의한 현재 녹음의 음성만 OpenAI 실시간 전사로 보내고 있습니다.");
+            SetStatus($"동의한 현재 녹음의 음성만 {AiProviders.Name(provider)} 실시간 전사로 보내고 있습니다.");
         }
         catch (System.Exception ex)
         {
             await client.DisposeAsync();
             _liveStart.Enabled = _recorder.IsRecording;
+            _speechProvider.Enabled = true;
             _liveState.Text = "실시간 전사: 연결 실패 · 로컬 녹음만";
             SetStatus(ex.Message.Contains("429", StringComparison.Ordinal)
-                ? "실시간 전사 연결 실패: HTTP 429 · OpenAI API 결제·한도·모델 사용 권한을 확인하세요. 로컬 녹음은 계속됩니다."
+                ? $"실시간 전사 연결 실패: HTTP 429 · {AiProviders.Name(provider)} API 결제·한도·모델 사용 권한을 확인하세요. 로컬 녹음은 계속됩니다."
                 : "실시간 전사 연결 실패. 네트워크·API 키·모델 사용 권한을 확인하세요. 로컬 녹음은 계속됩니다.");
         }
     }
@@ -307,11 +330,12 @@ internal sealed class ReviewPanel : UserControl
         {
             await client.DisposeAsync();
             _liveStart.Enabled = _recorder.IsRecording;
+            _speechProvider.Enabled = true;
             _liveState.Text = "실시간 전사: 꺼짐 · 로컬 녹음만";
         }
     }
 
-    private static bool ConfirmLiveUpload()
+    private static bool ConfirmLiveUpload(AiProvider provider)
     {
         using var dialog = new Form
         {
@@ -322,7 +346,7 @@ internal sealed class ReviewPanel : UserControl
         var explanation = new Label
         {
             Left = 16, Top = 12, Width = 445, Height = 84,
-            Text = "실시간 전사를 시작하면 지금부터 중지할 때까지의 마이크 음성 조각이 OpenAI로 전송됩니다. 고객 회의·개인정보가 포함된 음성은 필요한 권한을 확인한 뒤에만 시작하세요. 도면 데이터는 보내지 않습니다."
+            Text = $"실시간 전사를 시작하면 지금부터 중지할 때까지의 마이크 음성 조각이 {AiProviders.Name(provider)}로 전송됩니다. 고객 회의·개인정보가 포함된 음성은 필요한 권한을 확인한 뒤에만 시작하세요. 도면 데이터는 보내지 않습니다."
         };
         var consent = new CheckBox { Left = 16, Top = 103, Width = 440, Text = "현재 녹음의 외부 음성 전송에 동의합니다", Checked = false };
         var accept = new Button { Left = 270, Top = 138, Width = 92, Text = "동의하고 시작", Enabled = false, DialogResult = DialogResult.OK };
@@ -338,18 +362,19 @@ internal sealed class ReviewPanel : UserControl
     {
         var path = _selectedAudioPath;
         if (path is null) { SetStatus("먼저 녹음하거나 기존 WAV를 선택하세요. 전사문 직접 입력도 가능합니다."); return; }
-        if (string.IsNullOrWhiteSpace(_sessionApiKey) && !OpenAiTranscriber.HasEnvironmentKey && !PromptForApiKey())
+        var provider = SpeechProvider;
+        if (AiProviders.ResolveKey(provider, SessionKey(provider)) is null && !PromptForApiKey(provider))
         {
             SetStatus("전사 취소: API 키가 없습니다. 전사문을 직접 입력할 수 있습니다.");
             return;
         }
-        if (MessageBox.Show($"{Path.GetFileName(path)} 파일을 OpenAI 전사 API로 전송합니다. 동의하나요? 허가받지 않은 회의/고객 정보는 보내지 마세요.",
+        if (MessageBox.Show($"{Path.GetFileName(path)} 파일을 {AiProviders.Name(provider)} 전사 API로 전송합니다. 동의하나요? 허가받지 않은 회의/고객 정보는 보내지 마세요.",
                 "외부 전송 확인", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
         _transcribe.Enabled = false;
         try
         {
             SetStatus("전사 중…");
-            _transcript.Text = await OpenAiTranscriber.TranscribeAsync(path, _sessionApiKey);
+            _transcript.Text = await AiProviders.TranscribeAsync(provider, path, SessionKey(provider));
             var tagsSaved = ScanTranscript();
             SetStatus(tagsSaved
                 ? "전사 완료. 객체 언급 목록과 원문을 확인하세요."
@@ -419,11 +444,16 @@ internal sealed class ReviewPanel : UserControl
         else _tagReview.CompletePick(drawing, handle, entityType, layer);
     }
 
-    private bool PromptForApiKey()
+    private AiProvider SpeechProvider => _speechProvider.SelectedIndex == 1 ? AiProvider.Gemini : AiProvider.OpenAI;
+    private AiProvider ReviewProvider => _reviewProvider.SelectedIndex switch { 1 => AiProvider.Gemini, 2 => AiProvider.Claude, _ => AiProvider.OpenAI };
+    private string? SessionKey(AiProvider provider) => _sessionApiKeys.GetValueOrDefault(provider);
+
+    private bool PromptForApiKey(AiProvider? selected = null)
     {
+        var provider = selected ?? SpeechProvider;
         using var dialog = new Form
         {
-            Text = "OpenAI 전사 API 키",
+            Text = $"{AiProviders.Name(provider)} API 키",
             Width = 470,
             Height = 185,
             FormBorderStyle = FormBorderStyle.FixedDialog,
@@ -448,20 +478,36 @@ internal sealed class ReviewPanel : UserControl
             SetStatus("빈 API 키는 사용할 수 없습니다.");
             return false;
         }
-        _sessionApiKey = input.Text.Trim();
+        _sessionApiKeys[provider] = input.Text.Trim();
         input.Clear();
         UpdateKeyState();
-        SetStatus("전사 API 키가 이번 실행에만 설정됐습니다. 녹음 전사 버튼으로 전송을 확인하세요.");
+        SetStatus($"{AiProviders.Name(provider)} API 키가 이번 실행에만 설정됐습니다.");
         return true;
     }
 
     private void UpdateKeyState()
     {
-        _keyState.Text = !string.IsNullOrWhiteSpace(_sessionApiKey)
-            ? "전사 키: 이번 실행에만 입력됨"
-            : OpenAiTranscriber.HasEnvironmentKey
-                ? "전사 키: 로컬 환경변수에서 사용 가능"
-                : "전사 키: 미설정 — 녹음은 가능, API 전사는 불가";
+        var speech = SpeechProvider;
+        var review = ReviewProvider;
+        _keyState.Text = $"전사 {AiProviders.Name(speech)}: {(AiProviders.ResolveKey(speech, SessionKey(speech)) is null ? "키 미설정" : "키 사용 가능")} · " +
+                         $"검토 {AiProviders.Name(review)}: {(AiProviders.ResolveKey(review, SessionKey(review)) is null ? "키 미설정" : "키 사용 가능")}";
+    }
+
+    private async Task ReviewWithAiAsync()
+    {
+        var provider = ReviewProvider;
+        if (string.IsNullOrWhiteSpace(_transcript.Text)) { SetStatus("AI 검토할 전사문을 먼저 입력하세요."); return; }
+        if (AiProviders.ResolveKey(provider, SessionKey(provider)) is null && !PromptForApiKey(provider)) return;
+        if (MessageBox.Show($"전사문을 {AiProviders.Name(provider)}에 보내 검토합니다. 도면·객체 정보는 보내지 않고 CAD 변경도 실행하지 않습니다. 전송에 동의하나요?",
+                "전사문 외부 전송 확인", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+        _aiReview.Enabled = false;
+        try
+        {
+            _aiReviewResult.Text = await AiProviders.ReviewAsync(provider, _transcript.Text, SessionKey(provider));
+            SetStatus($"{AiProviders.Name(provider)} 검토 완료. 제안은 직접 확인하고, 도면 변경은 별도 승인하세요.");
+        }
+        catch (System.Exception ex) { SetStatus("AI 검토 실패: " + ex.Message); }
+        finally { _aiReview.Enabled = true; }
     }
 
     private void Analyze()
@@ -530,7 +576,7 @@ internal sealed class ReviewPanel : UserControl
             _liveClient?.DisposeAsync().AsTask().GetAwaiter().GetResult();
             _recorder.Dispose();
             _tooltips.Dispose();
-            _sessionApiKey = null;
+            _sessionApiKeys.Clear();
         }
         base.Dispose(disposing);
     }

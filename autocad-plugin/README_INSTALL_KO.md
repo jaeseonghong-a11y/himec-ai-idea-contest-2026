@@ -53,6 +53,8 @@ README_INSTALL_KO.md       이 안내문
 - `녹음 전사(API 호출)`을 누르면 파일 외부 전송 확인창이 뜹니다. 동의한 파일만 OpenAI로 보냅니다. 회의 참여자 동의나 고객 자료 반출 권한이 없다면 누르지 마세요. Anthropic·Gemini 키는 이 **전사 버튼**에서 사용할 수 없습니다.
 - API 키를 팀원·팀장·AI 채팅·GitHub 이슈에 보내지 마세요. 전사가 실패하면 상단 상태 메시지와 오류창을 확인하고 HTTP 코드만 공유하세요.
 
+> **개발 중인 #42 제공자 통합판:** 이 절의 OpenAI 전용 설명은 배포된 `v0.4.3-lab` 기준입니다. #42 브랜치에서는 Gemini 파일/실시간 전사와 OpenAI·Gemini·Claude 텍스트 검토를 추가했습니다. Claude 직접 WAV 전사는 지원하지 않습니다. 새 배포판 설치 전까지는 현재 설치판에 적용되지 않습니다. 사용 흐름·검증 경계는 `README_LIVE_PREVIEW_KO.md`의 맨 위를 확인하세요.
+
 ## 5. 팀과 함께 개발하기
 
 소스 코드는 [팀 저장소의 `autocad-plugin/`](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/tree/main/autocad-plugin)에 있습니다. 팀원은 자신의 지정 작업 브랜치와 담당 파일을 지키고, 새 플러그인 작업이 필요하면 팀장에게 이슈·브랜치 배정을 요청하세요. `main`에 직접 push하거나 자기 PR을 병합하지 마세요. 사용 중 발견한 오류는 **AutoCAD 버전, 배포 버전, 재현 단계, 합성 시험 도면 여부, 오류 문구**를 남겨주세요. API 키, 실제 녹음, 고객 도면은 첨부하지 마세요.
