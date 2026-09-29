@@ -24,6 +24,7 @@ dotnet build autocad-plugin/Himec.AutoCad2026/Himec.AutoCad2026.csproj -c Releas
 ```
 
 `package.ps1`은 기존 버전을 덮어쓰지 않는다. `dist/0.1.0/Himec.ChangeLoop.bundle`를 만든다. 빌드 결과에 Autodesk DLL은 포함하지 않고 NAudio 및 프로젝트 DLL만 포함한다.
+새 버전 패키지마다 Autodesk 권장대로 `ProductCode`를 새 GUID로 만들고 `UpgradeCode`는 유지한다. 같은 버전을 다시 만들 때도 결과 디렉터리가 이미 있으면 중단한다.
 
 ## AutoCAD에서 로드
 

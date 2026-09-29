@@ -21,6 +21,7 @@ if ($LASTEXITCODE -ne 0) { throw "Build failed." }
 New-Item -ItemType Directory -Path $contentRoot -Force | Out-Null
 $manifest = [xml](Get-Content -LiteralPath (Join-Path $pluginRoot "packaging/PackageContents.xml") -Raw -Encoding UTF8)
 $manifest.ApplicationPackage.SetAttribute("AppVersion", "$Version.0")
+$manifest.ApplicationPackage.SetAttribute("ProductCode", ([guid]::NewGuid().ToString('B').ToUpperInvariant()))
 $manifest.Save((Join-Path $bundleRoot "PackageContents.xml"))
 $required = @("Himec.AutoCad2026.dll", "Himec.ChangeCore.dll", "NAudio.dll", "NAudio.Core.dll", "NAudio.WinMM.dll")
 foreach ($name in $required) {
