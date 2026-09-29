@@ -118,4 +118,93 @@ if (roundTrip.Tags.Count != rtSession.Tags.Count ||
     roundTrip.Tags.First(t => t.TranscriptTurnId == "turn-1b").ApproximateOffsetSeconds != 2.5 ||
     !roundTrip.ProcessedTranscriptTurnIds.Contains("turn-1"))
     throw new Exception("Realtime tag contract did not round-trip");
-Console.WriteLine("Parser, targeting, legacy recording tags, and realtime tag contract checks passed");
+// --- change matching: transcript edits paired with tagged drawing objects ---
+var matchSession = new RecordingTagSession { RecordingPath = "match.wav" };
+var c1Tag = matchSession.AddManual("C1");
+matchSession.Link(c1Tag.Id, "plan.dxf", "A1", "INSERT", "COLUMN");
+var b12Tag = matchSession.AddManual("B12");
+matchSession.Link(b12Tag.Id, "plan.dxf", "A2", "INSERT", "BEAM");
+
+var everyMove = InstructionParser.ParseAllMoves("C1을 위로 30cm 올리고 B12를 아래로 200mm 내리자");
+if (everyMove.Count != 2 || everyMove[0].DyMm != 300 || everyMove[1].DyMm != -200)
+    throw new Exception("ParseAllMoves lost a movement");
+if (InstructionParser.ParseAllMoves("위로 999999mm 올리자").Count != 0)
+    throw new Exception("Out-of-range amount was accepted");
+
+var matched = ChangeMatching.Extract("C1을 위로 30cm 올리자.", matchSession, "plan.dxf");
+if (matched.Count != 1 || !matched[0].IsMatched || matched[0].Handle != "A1" ||
+    matched[0].TagId != c1Tag.Id || matched[0].DyMm != 300)
+    throw new Exception("Explicit id was not matched to its tagged object");
+if (ChangeMatching.Unanswered(matched).Count != 0)
+    throw new Exception("A matched change was still queued as a question");
+
+var noTarget = ChangeMatching.Extract("위로 30cm 올리자.", matchSession, "plan.dxf");
+if (noTarget.Count != 1 || noTarget[0].QuestionKind != ChangeQuestionKind.NoObjectMentioned ||
+    noTarget[0].Handle is not null)
+    throw new Exception("Change without a target was not turned into a question");
+
+var genericOnly = ChangeMatching.Extract("기둥을 위로 30cm 올리자.", matchSession, "plan.dxf");
+if (genericOnly.Count != 1 || genericOnly[0].QuestionKind != ChangeQuestionKind.GenericOnly ||
+    genericOnly[0].Handle is not null)
+    throw new Exception("Generic noun was auto-linked");
+
+var unknownMark = ChangeMatching.Extract("C9를 위로 30cm 올리자.", matchSession, "plan.dxf");
+if (unknownMark.Count != 1 || unknownMark[0].QuestionKind != ChangeQuestionKind.NoTagFound)
+    throw new Exception("Unknown mark did not ask the user");
+
+var otherDrawing = ChangeMatching.Extract("C1을 위로 30cm 올리자.", matchSession, "section.dxf");
+if (otherDrawing.Count != 1 || otherDrawing[0].QuestionKind != ChangeQuestionKind.NoTagFound)
+    throw new Exception("A tag from another drawing was used");
+
+var duplicate = matchSession.AddManual("C1");
+matchSession.Link(duplicate.Id, "plan.dxf", "A3", "INSERT", "COLUMN");
+var ambiguous = ChangeMatching.Extract("C1을 위로 30cm 올리자.", matchSession, "plan.dxf");
+if (ambiguous.Count != 1 || ambiguous[0].QuestionKind != ChangeQuestionKind.MultipleTags ||
+    ambiguous[0].CandidateTagIds.Count != 2 || ambiguous[0].Handle is not null)
+    throw new Exception("Duplicate tags were not turned into a question");
+matchSession.Remove(duplicate.Id);
+
+var twoInOne = ChangeMatching.Extract("C1을 위로 30cm 올리고 B12를 아래로 200mm 내리자.", matchSession, "plan.dxf");
+if (twoInOne.Count != 2 ||
+    twoInOne.Any(c => c.QuestionKind != ChangeQuestionKind.SeveralChangesInSentence))
+    throw new Exception("Two edits in one sentence were paired without asking");
+
+var several = ChangeMatching.Extract(
+    "C1을 위로 30cm 올리자. 그리고 B12를 아래로 200mm 내리자. 오늘 회의는 여기까지.",
+    matchSession, "plan.dxf");
+if (several.Count != 2 || !several[0].IsMatched || !several[1].IsMatched ||
+    several[0].Handle != "A1" || several[1].Handle != "A2")
+    throw new Exception("Multiple sentences were not matched independently");
+if (ChangeMatching.Extract("오늘 회의는 여기까지.", matchSession, "plan.dxf").Count != 0)
+    throw new Exception("Small talk produced a change item");
+if (ChangeMatching.Describe(several[0]) != "Y +300 mm")
+    throw new Exception("Move description is wrong: " + ChangeMatching.Describe(several[0]));
+
+// --- pdf export plan: callouts on matched objects, schedule for everything ---
+var planInput = ChangeMatching.Extract(
+    "C1을 위로 30cm 올리자. 기둥을 아래로 200mm 내리자. 오늘은 여기까지.",
+    matchSession, "plan.dxf");
+var plan = PdfExportPlanner.Build(planInput, "plan.dxf");
+if (plan.MatchedCount != 1 || plan.QuestionCount != 1)
+    throw new Exception("Plan counted the wrong number of changes");
+if (plan.Schedule.Count != 2)
+    throw new Exception("Every change must appear in the schedule");
+if (plan.Annotations.Count != 1 || plan.Annotations[0].Handle != "A1")
+    throw new Exception("Only a settled target may get a callout");
+if (plan.Annotations[0].Marker != "1" || plan.Schedule[0].Marker != "1" || plan.Schedule[1].Marker != "2")
+    throw new Exception("Markers must number the transcript order");
+if (!plan.Annotations[0].Text.Contains("C1") || !plan.Annotations[0].Text.Contains("Y +300 mm"))
+    throw new Exception("Callout text lost the target or the move");
+if (plan.Schedule[1].State != PdfExportPlanner.StateQuestion || plan.Schedule[1].Note.Length == 0)
+    throw new Exception("An unresolved change must carry its question into the schedule");
+if (plan.Schedule[0].State != PdfExportPlanner.StateConfirmedTarget)
+    throw new Exception("A settled change was not marked as confirmed target");
+if (PdfExportPlanner.Cells(plan.Schedule[0]).Count != PdfExportPlanner.Headers.Count)
+    throw new Exception("Schedule row does not match the header count");
+if (!plan.Footer.Contains("도면은 수정되지 않았습니다"))
+    throw new Exception("Footer must state that the drawing was not edited");
+var emptyPlan = PdfExportPlanner.Build([], "plan.dxf");
+if (emptyPlan.Schedule.Count != 0 || emptyPlan.Annotations.Count != 0 || emptyPlan.MatchedCount != 0)
+    throw new Exception("Empty change list produced content");
+
+Console.WriteLine("Parser, targeting, legacy recording tags, realtime tag contract, change matching, and pdf plan checks passed");

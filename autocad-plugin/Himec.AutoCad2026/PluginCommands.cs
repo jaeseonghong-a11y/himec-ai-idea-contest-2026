@@ -109,6 +109,36 @@ public sealed class PluginCommands : IExtensionApplication
         _panel?.SetStatus(reason);
     }
 
+    [CommandMethod("HIMEC_PDF")]
+    public void ExportPdf()
+    {
+        var doc = AcadApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        if (_panel is null)
+        {
+            doc.Editor.WriteMessage("\nHIMEC: 먼저 HIMEC 명령으로 팔레트를 여세요.\n");
+            return;
+        }
+        var plan = _panel.BuildPdfPlan(doc.Name, out var reason);
+        if (plan is null) { _panel.SetStatus(reason); return; }
+        try
+        {
+            var folder = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Himec", "Exports");
+            Directory.CreateDirectory(folder);
+            var stem = Path.GetFileNameWithoutExtension(doc.Name);
+            var path = Path.Combine(folder, $"{stem}-변경일람-{DateTime.Now:yyyyMMdd-HHmmss}.pdf");
+            PdfExporter.Export(doc, plan, path);
+            doc.Editor.WriteMessage($"\nHIMEC: PDF를 저장했습니다. {path}\n");
+            _panel.SetStatus($"PDF 저장 완료 — 확정 {plan.MatchedCount}건, 확인 필요 {plan.QuestionCount}건. 도면은 수정하지 않았습니다.");
+        }
+        catch (System.Exception ex)
+        {
+            doc.Editor.WriteMessage($"\nHIMEC: PDF 내보내기 실패: {ex.Message}\n");
+            _panel.SetStatus("PDF 내보내기 실패: " + ex.Message);
+        }
+    }
+
     [CommandMethod("HIMEC_APPLY")]
     public void ApplyReviewedMove()
     {

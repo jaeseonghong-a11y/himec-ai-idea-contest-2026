@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-
 namespace Himec.ChangeCore;
 
 public sealed record CompletedTranscriptTurn(string Id, string Text, double ApproximateOffsetSeconds);
@@ -14,11 +12,6 @@ public sealed record RecordingObjectCandidate(
 
 public static class RealtimeTagging
 {
-    private static readonly Regex ExplicitId = new(@"(?<![A-Za-z0-9])(?:[CBE]-?\d{1,4})(?![A-Za-z0-9])",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex GenericObject = new(@"기둥|덕트|배관|장비|(?<![가-힣])보(?=를|가|는|의|\s|$)",
-        RegexOptions.Compiled);
-
     public static IReadOnlyList<RecordingTag> AddCompletedTurn(
         RecordingTagSession session,
         CompletedTranscriptTurn turn,
@@ -41,12 +34,8 @@ public static class RealtimeTagging
             session.ProcessedTranscriptTurnIds.Add(turn.Id);
             return [];
         }
-        // MatchCollection is only IEnumerable<Match> on .NET Core; Cast keeps both targets working.
-        var ids = ExplicitId.Matches(quote).Cast<Match>().Select(m => m.Value.ToUpperInvariant())
-            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var labels = ids.Length > 0
-            ? ids
-            : GenericObject.Matches(quote).Cast<Match>().Select(m => m.Value).Distinct().ToArray();
+        var ids = ObjectMentions.ExplicitIds(quote);
+        var labels = ObjectMentions.Labels(quote);
         var candidates = drawingCandidates.Where(c =>
             string.Equals(c.Drawing, currentDrawing, StringComparison.OrdinalIgnoreCase) &&
             !string.IsNullOrWhiteSpace(c.Handle)).ToArray();
@@ -55,7 +44,7 @@ public static class RealtimeTagging
         foreach (var label in labels)
         {
             RecordingObjectCandidate[] matches = ids.Length == 0 ? [] : candidates
-                .Where(c => c.Identifiers.Any(i => NormalizeId(i) == NormalizeId(label)))
+                .Where(c => c.Identifiers.Any(i => ObjectMentions.Normalize(i) == ObjectMentions.Normalize(label)))
                 .GroupBy(c => c.Handle, StringComparer.OrdinalIgnoreCase)
                 .Select(g => g.First())
                 .OrderBy(c => c.Handle, StringComparer.OrdinalIgnoreCase)
@@ -86,6 +75,4 @@ public static class RealtimeTagging
         session.ProcessedTranscriptTurnIds.Add(turn.Id);
         return added;
     }
-
-    private static string NormalizeId(string value) => value.Trim().Replace("-", "").ToUpperInvariant();
 }

@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using System.Text.Json.Serialization;
 
 namespace Himec.ChangeCore;
@@ -39,9 +38,6 @@ public static class RecordingTagSuggestionStatus
 
 public sealed class RecordingTagSession
 {
-    private static readonly Regex ExplicitId = new(@"(?<![A-Za-z0-9])(?:[CBE]-?\d{1,4})(?![A-Za-z0-9])", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex GenericObject = new(@"기둥|덕트|배관|장비|(?<![가-힣])보(?=를|가|는|의|\s|$)", RegexOptions.Compiled);
-
     public string RecordingPath { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
     public List<RecordingTag> Tags { get; set; } = [];
@@ -59,13 +55,9 @@ public sealed class RecordingTagSession
     public int AddTranscriptMentions(string transcript)
     {
         var count = 0;
-        foreach (var sentence in Regex.Split(transcript, @"[.!?\r\n]+"))
+        foreach (var quote in ObjectMentions.Sentences(transcript))
         {
-            var quote = sentence.Trim();
-            if (quote.Length == 0) continue;
-            var labels = ExplicitId.Matches(quote).Cast<Match>().Select(m => m.Value.ToUpperInvariant()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            if (labels.Length == 0)
-                labels = GenericObject.Matches(quote).Cast<Match>().Select(m => m.Value).Distinct().ToArray();
+            var labels = ObjectMentions.Labels(quote);
             foreach (var label in labels)
             {
                 if (Tags.Any(t => t.Origin == "transcript" && t.ExtractionKey == label && t.SourceQuote == quote)) continue;

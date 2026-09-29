@@ -26,6 +26,7 @@ internal sealed class ReviewPanel : UserControl
     private readonly Button _pick = new() { Text = "도면에서 대상 직접 선택", Width = 340 };
     private readonly Button _approve = new() { Text = "지시 승인", Width = 340 };
     private readonly Button _execute = new() { Text = "승인된 변경 실행", Width = 340 };
+    private readonly Button _exportPdf = new() { Text = "수정사항 PDF로 내보내기", Width = 340 };
     private readonly RecordingTagPanel _tagReview = new();
     private string? _sessionApiKey;
     private string? _selectedAudioPath;
@@ -75,7 +76,8 @@ internal sealed class ReviewPanel : UserControl
         var cardParse = CreateCard("03  변경 지시 확인", "이동량을 읽고, 불명확한 대상은 보류합니다.", _analyze, _summary);
         var cardTarget = CreateCard("04  도면 대상 지정", "후보는 참고용 · 최종 대상은 직접 클릭", _suggest, _pick, _target);
         var cardApply = CreateCard("05  검토 후 반영", "승인 전에는 도면을 수정하지 않습니다.", _approve, _execute);
-        var cards = new[] { cardInput, cardTags, cardParse, cardTarget, cardApply };
+        var cardExport = CreateCard("06  PDF 내보내기", "일람표는 도면 우측, 주석은 해당 요소 위. 도면은 그대로 둡니다.", _exportPdf);
+        var cards = new[] { cardInput, cardTags, cardParse, cardTarget, cardApply, cardExport };
         foreach (var card in cards) layout.Controls.Add(card);
         layout.SizeChanged += (_, _) =>
         {
@@ -95,7 +97,7 @@ internal sealed class ReviewPanel : UserControl
         shell.Controls.Add(layout, 0, 2);
         Controls.Add(shell);
 
-        foreach (var button in new[] { _record, _stop, _chooseAudio, _setApiKey, _transcribe, _analyze, _suggest, _pick, _approve, _execute })
+        foreach (var button in new[] { _record, _stop, _chooseAudio, _setApiKey, _transcribe, _analyze, _suggest, _pick, _approve, _execute, _exportPdf })
             PaletteTheme.Button(button, primary: button == _analyze || button == _pick, caution: button == _execute);
         foreach (var label in new[] { _keyState, _recordingInfo, _summary, _target }) PaletteTheme.Label(label);
         _summary.ForeColor = PaletteTheme.Text;
@@ -115,11 +117,37 @@ internal sealed class ReviewPanel : UserControl
         _analyze.Click += (_, _) => Analyze();
         _suggest.Click += (_, _) => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_SUGGEST ", true, false, false);
         _pick.Click += (_, _) => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_PICK ", true, false, false);
+        _exportPdf.Click += (_, _) => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_PDF ", true, false, false);
         _approve.Click += (_, _) => Approve();
         _execute.Click += (_, _) => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_APPLY ", true, false, false);
         _tagReview.StatusChanged += SetStatus;
         _tagReview.ScanRequested += () => { _tagReview.AddTranscriptMentions(_transcript.Text); };
         _tagReview.PickRequested += () => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_TAG_PICK ", true, false, false);
+    }
+
+    /// <summary>Match the transcript against the tagged objects and lay out the PDF content.
+    /// Returns null with a reason when there is nothing to export yet.</summary>
+    internal PdfExportPlan? BuildPdfPlan(string drawing, out string reason)
+    {
+        reason = "";
+        var session = _tagReview.Session;
+        if (session is null)
+        {
+            reason = "먼저 녹음 파일을 선택하거나 태그를 만드세요.";
+            return null;
+        }
+        if (string.IsNullOrWhiteSpace(_transcript.Text))
+        {
+            reason = "전사문이 비어 있습니다. 전사하거나 직접 입력하세요.";
+            return null;
+        }
+        var changes = ChangeMatching.Extract(_transcript.Text, session, drawing);
+        if (changes.Count == 0)
+        {
+            reason = "전사문에서 수정사항을 찾지 못했습니다.";
+            return null;
+        }
+        return PdfExportPlanner.Build(changes, drawing);
     }
 
     public void SetStatus(string text)

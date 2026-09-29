@@ -24,6 +24,9 @@ internal sealed class RecordingTagPanel : UserControl
     public event Action? ScanRequested;
     public event Action<string>? StatusChanged;
 
+    /// <summary>The tags the PDF export matches change instructions against.</summary>
+    internal RecordingTagSession? Session => _session;
+
     public RecordingTagPanel()
     {
         Height = 328;

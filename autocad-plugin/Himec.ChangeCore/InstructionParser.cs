@@ -27,13 +27,42 @@ public static class InstructionParser
             return false;
         }
 
-        var amountText = match.Groups["amount"].Value.Replace(',', '.');
-        if (!double.TryParse(amountText, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var amount)
-            || double.IsNaN(amount) || double.IsInfinity(amount) || amount <= 0 || amount > 100_000)
+        if (!TryBuild(match, sourceText, out instruction))
         {
             reason = "이동량이 유효하지 않습니다.";
             return false;
         }
+        reason = "대상 객체를 아직 확정하지 않았습니다. 도면에서 직접 선택하고 검토해야 합니다.";
+        return true;
+    }
+
+    /// <summary>Every movement phrase in the text, in the order it was spoken.
+    ///
+    /// TryParseMove returns only the first one, which is what the single-change
+    /// palette flow uses. Change matching needs them all so a transcript that
+    /// mentions several edits does not silently lose the rest.
+    /// </summary>
+    public static IReadOnlyList<ChangeInstruction> ParseAllMoves(string sourceText)
+    {
+        var found = new List<ChangeInstruction>();
+        if (string.IsNullOrWhiteSpace(sourceText)) return found;
+        foreach (Match match in Movement.Matches(sourceText))
+        {
+            // An out-of-range amount is dropped rather than clamped: a wrong number
+            // must not turn into a drawing edit.
+            if (TryBuild(match, sourceText, out var instruction) && instruction is not null)
+                found.Add(instruction);
+        }
+        return found;
+    }
+
+    private static bool TryBuild(Match match, string sourceText, out ChangeInstruction? instruction)
+    {
+        instruction = null;
+        var amountText = match.Groups["amount"].Value.Replace(',', '.');
+        if (!double.TryParse(amountText, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var amount)
+            || double.IsNaN(amount) || double.IsInfinity(amount) || amount <= 0 || amount > 100_000)
+            return false;
 
         var unit = match.Groups["unit"].Value.ToLowerInvariant();
         var factor = unit switch
@@ -51,7 +80,6 @@ public static class InstructionParser
             DyMm = direction == "위" ? distance : direction == "아래" ? -distance : 0,
             Status = "needs_review"
         };
-        reason = "대상 객체를 아직 확정하지 않았습니다. 도면에서 직접 선택하고 검토해야 합니다.";
         return true;
     }
 }
