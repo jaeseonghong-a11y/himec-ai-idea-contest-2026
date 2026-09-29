@@ -2,16 +2,16 @@
 
 ## Round 02 — 설계 변경 피드백 루프 (2026-09-29)
 
-기준: `docs/PROJECT_BRIEF.md`, `prototype/CONTRACT.md`. 아래 `r02` 브랜치는 팀장이 기준 문서 PR을 `main`에 병합한 뒤 최신 `main`에서 생성한다. 생성 확인 전에는 기존 `r01` 브랜치를 새 과제용으로 재사용하거나 팀원이 직접 새 브랜치를 만들지 않는다.
+기준: `docs/PROJECT_BRIEF.md`, `prototype/CONTRACT.md`. 아래 `r02` 브랜치는 팀장이 2026-09-29 `main`의 `14f199e`에서 생성했고 원격 존재를 확인했다. 기존 `r01` 브랜치를 새 과제용으로 재사용하거나 팀원이 직접 새 브랜치를 만들지 않는다. 새 라운드 시작 요청문은 `prompts/ROUND_02_START.md`에 있다.
 
 | 담당 | 지정 브랜치 | 새 이슈 | 담당 파일 |
 |---|---|---|---|
-| `kijun-0108` | `work/kijun-0108/r02` (생성 대기) | [#17 합성 도면·대본·사이드카](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/17) | `prototype/samples/`, `prototype/sidecar/` |
-| `archuni` | `work/archuni/r02` (생성 대기) | [#18 변경지시 추출·PDF 주석·승인](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/18) | `prototype/extract/`, `prototype/annotate/` |
-| `ehgudwns18` | `work/ehgudwns18/r02` (생성 대기) | [#20 경량 관계 그래프](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/20) | `prototype/graph/` |
+| `kijun-0108` | `work/kijun-0108/r02` (생성됨) | [#17 합성 도면·대본·사이드카](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/17) | `prototype/samples/`, `prototype/sidecar/` |
+| `archuni` | `work/archuni/r02` (생성됨) | [#18 변경지시 추출·PDF 주석·승인](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/18) | `prototype/extract/`, `prototype/annotate/` |
+| `ehgudwns18` | `work/ehgudwns18/r02` (생성됨) | [#20 경량 관계 그래프](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/20) | `prototype/graph/` |
 | `jaeseonghong-a11y` | 팀장 전용 작업 브랜치 | [#19 승인된 DXF 변경 전파·검사](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/19) | `prototype/propagate/`, 통합·제출 문서 |
 
-Round 01의 조사 결과와 브랜치는 삭제하지 않는다. 아이디어 확정 전 후보 평가(`#7`, `#8`, PR `#14`)는 새 방향으로 대체되었으므로 팀장이 이슈/PR에 이유를 남기고 정리한다. #9/PR #13의 구현 경로 조사는 이미 `main`에 반영했다.
+Round 01의 조사 결과와 브랜치는 삭제하지 않는다. 아이디어 확정 전 후보 평가(`#7`, `#8`, PR `#14`)는 새 방향으로 대체되어 2026-09-29 이유를 남기고 종료했다. #9/PR #13의 구현 경로 조사는 이미 `main`에 반영했다.
 
 팀원과 AI는 이 표의 브랜치를 임의로 바꾸거나 새로 만들지 않는다. 팀장 AI만 라운드를 갱신한다.
 
