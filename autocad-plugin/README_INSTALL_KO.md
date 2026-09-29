@@ -1,0 +1,50 @@
+# HIMEC 설계 변경 플러그인 — 다운로드부터 사용까지
+
+이 ZIP은 **AutoCAD 2026용 v0.2.1-preview** 팀 공동 개발판입니다. Windows의 정식 AutoCAD 2026에서만 사용하세요. AutoCAD LT·Mac·AutoCAD 2024용이 아닙니다. **최종 기능 검증판이 아닙니다.** 실제 OpenAI 전사와 승인 후 도면 이동/UNDO는 팀이 앞으로 검증합니다. 우선 합성 시험 도면의 사본에서만 사용하세요.
+
+압축을 풀면 다음 세 항목이 있어야 합니다.
+
+```text
+Himec.ChangeLoop.bundle/   AutoCAD 플러그인 본체
+install-user.ps1           사용자별 설치·이전 버전 백업 스크립트
+README_INSTALL_KO.md       이 안내문
+```
+
+## 1. 다운로드와 파일 확인
+
+1. 팀 저장소의 [v0.2.1-preview 배포 페이지](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/releases/tag/v0.2.1-preview)에서 `Himec.ChangeLoop-AutoCAD2026-v0.2.1-team.zip`을 다운로드하세요. 저장소의 초록색 **Code → Download ZIP**은 소스 코드이며, 설치용 ZIP과 다릅니다.
+2. 배포 페이지에 적힌 SHA-256과 다운로드한 ZIP의 해시를 비교하세요. PowerShell에서 `Get-FileHash -LiteralPath 'ZIP 파일 전체 경로' -Algorithm SHA256`을 실행하면 됩니다. 값이 다르면 설치하지 마세요.
+3. ZIP을 원하는 폴더에 압축 해제하고 위 세 항목이 보이는지 확인하세요.
+
+## 2. 설치 또는 업데이트
+
+1. 작업 중인 도면을 저장하고 **AutoCAD를 완전히 종료**하세요.
+2. 압축을 푼 폴더에서 PowerShell을 열어 다음을 실행하세요. `install-user.ps1`과 `.bundle` 폴더가 같은 위치에 있어야 합니다.
+
+```powershell
+./install-user.ps1 -BundlePath ./Himec.ChangeLoop.bundle
+```
+
+3. 화면에 `InstalledVersion : 0.2.1.0`과 설치 경로가 나오면 설치가 끝난 것입니다. 스크립트는 내 사용자 계정의 `%APPDATA%\Autodesk\ApplicationPlugins\Himec.ChangeLoop.bundle`에 설치하며, 이전 버전은 `.himec-backups`에 보존합니다. 관리자 권한은 필요 없습니다.
+4. 회사 PC의 PowerShell 실행 정책이 스크립트를 막으면 보안 설정을 임의로 낮추지 말고 PC 관리자/팀장에게 문의하세요. 이때 AutoCAD를 종료한 상태에서 위 사용자별 설치 경로를 확인하고, 기존 번들을 별도로 백업한 다음 압축 속 `.bundle` 폴더를 복사하는 방법도 있습니다.
+5. AutoCAD 2026을 다시 실행하세요. 새 버전은 **Git pull만으로 자동 갱신되지 않으며**, 업데이트할 때마다 이 설치 절차와 재시작이 필요합니다.
+
+## 3. 첫 실행
+
+1. AutoCAD 명령창에 `HIMEC`을 입력하세요. 오른쪽에 어두운 **HIMEC 설계 변경** 팔레트가 열려야 합니다. 보안 경고가 나오면 경로·게시자·버전을 직접 확인하세요. `SECURELOAD`를 낮추지 마세요.
+2. 처음에는 실제 업무 도면 대신 합성 시험 도면을 **파일로 열어** 사용하세요. 저장소의 `autocad-plugin/tests/three_columns_mm.dxf`를 사용할 수 있습니다. 이 파일을 현재 도면 안에 통째로 **삽입**하면 기둥 3개가 하나의 외부 블록으로 취급돼 대상 선택이 되지 않습니다.
+3. 팔레트에서 직접 문장을 입력해 시험할 수 있습니다. 예: `왼쪽에서 세번째 이 기둥을 위로 30cm 옮기자`. `전사문에서 이동 지시 찾기`를 누르면 제안 이동량 **X 0 mm / Y +300 mm**를 보여줍니다. 이는 로컬 규칙 분석이며 AI가 기둥을 확정한 것은 아닙니다.
+4. `후보 찾기`는 제한된 조건에서만 왼쪽 세 번째 기둥을 추천합니다. 대상은 반드시 `도면에서 대상 직접 선택`으로 블록을 클릭해 확정하세요. 지시와 도면을 확인한 뒤에만 `지시 승인`과 `승인된 변경 실행`을 순서대로 사용하세요. 실행은 자동 저장하지 않으며, 문제가 있으면 AutoCAD `UNDO`를 사용하세요. **현재 이 마지막 실행 흐름은 최종 검증 전이므로 합성 시험 사본에서만 시도하세요.**
+
+## 4. 녹음과 전사 API 키
+
+- `녹음 시작` → `녹음 중지`는 로컬 WAV 파일을 `%LOCALAPPDATA%\Himec\Recordings`에 저장합니다. 키 없이도 녹음과 전사문 직접 입력은 가능합니다. 이전 WAV는 `이미 녹음한 WAV 선택`으로 다시 고를 수 있습니다.
+- 전사에는 **OpenAI API 키**가 필요합니다. 각자 [OpenAI API 키 페이지](https://platform.openai.com/api-keys)에서 키를 만들고, 팔레트의 `전사 API 키 입력` 창에 직접 넣으세요. 현재 실행 중 메모리에서만 사용하며 ZIP·Git에 저장하지 않습니다. ChatGPT 구독과 API 사용 결제는 별도일 수 있으니 본인 API 계정의 결제/한도를 확인하세요.
+- `녹음 전사(API 호출)`을 누르면 파일 외부 전송 확인창이 뜹니다. 동의한 파일만 OpenAI로 보냅니다. 회의 참여자 동의나 고객 자료 반출 권한이 없다면 누르지 마세요. Anthropic·Gemini 키는 이 **전사 버튼**에서 사용할 수 없습니다.
+- API 키를 팀원·팀장·AI 채팅·GitHub 이슈에 보내지 마세요. 전사가 실패하면 상단 상태 메시지와 오류창을 확인하고 HTTP 코드만 공유하세요.
+
+## 5. 팀과 함께 개발하기
+
+소스 코드는 [팀 저장소의 `autocad-plugin/`](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/tree/main/autocad-plugin)에 있습니다. 팀원은 자신의 지정 작업 브랜치와 담당 파일을 지키고, 새 플러그인 작업이 필요하면 팀장에게 이슈·브랜치 배정을 요청하세요. `main`에 직접 push하거나 자기 PR을 병합하지 마세요. 사용 중 발견한 오류는 **AutoCAD 버전, 배포 버전, 재현 단계, 합성 시험 도면 여부, 오류 문구**를 남겨주세요. API 키, 실제 녹음, 고객 도면은 첨부하지 마세요.
+
+설치가 실패하면 먼저 AutoCAD가 종료됐는지, ZIP 해시가 일치하는지, `HIMEC` 명령이 보이는지 확인하세요. 되돌려야 하면 AutoCAD를 종료한 뒤 설치 스크립트가 알려준 `PreviousVersionBackup` 경로를 팀장에게 전달하고 백업 복원을 요청하세요. 기존 번들을 덮어쓰거나 삭제하기 전에 백업 경로를 반드시 확인하세요.
