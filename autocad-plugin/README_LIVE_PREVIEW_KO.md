@@ -2,7 +2,7 @@
 
 ## 3개 AI 제공자 통합 시험판 v0.5.0-lab (#42)
 
-`v0.4.3-lab` 설치판은 여전히 OpenAI 전용입니다. 이 절의 새 기능은 `v0.5.0-lab`에 들어 있습니다. 새 버전을 설치하고 AutoCAD를 다시 열기 전에는 화면에 나타나지 않습니다. 빌드·합성 팔레트 검사는 통과했지만 **실제 계정, 마이크, AutoCAD 호스트 호출은 미검증**입니다.
+`v0.4.3-lab` 설치판은 여전히 OpenAI 전용입니다. 이 절의 새 기능은 [v0.5.0-lab](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/releases/tag/v0.5.0-lab)에 들어 있습니다. 새 버전을 설치하고 AutoCAD를 다시 열기 전에는 화면에 나타나지 않습니다. 빌드·합성 팔레트 검사는 통과했지만 **실제 계정, 마이크, AutoCAD 호스트 호출은 미검증**입니다. 배포 ZIP SHA-256: `3EE31B682AE5A399AF07AF3811A21C79E0A41FA44DA44CF2437C6ED835DA9AC5`.
 
 1. `음성 전사 제공자`에서 OpenAI 또는 Gemini를 선택합니다. Claude는 음성 전사 제공자가 아닙니다.
 2. `전사 API 키 입력`에 해당 제공자의 키를 입력합니다. 각 키는 이번 실행 메모리에만 유지됩니다. 로컬 환경변수 `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`도 사용할 수 있습니다.
