@@ -50,6 +50,10 @@
 
 공개 저장소이므로 코드와 이력이 누구에게나 보인다. 개인정보가 기입된 신청서, 서명, 연락처, 토큰, 고객 자료는 `submission-private/` 또는 저장소 밖에 둔다.
 
+## GitHub 이슈 본문 인코딩
+
+한글이 들어간 이슈·PR 본문은 UTF-8로 저장한 Markdown 파일을 `gh issue/pr create/edit --body-file <파일>`에 전달하거나 Unicode 문자열을 `--body` 인수로 직접 넘긴다. PowerShell에서 한글 here-string을 CLI 표준입력으로 파이프하면 `?`로 바뀔 수 있다. 작성 후 GitHub 본문을 다시 조회해 `완료 기준` 등 한글이 실제로 보이는지 확인한다. Round 01 이슈 #7~#9의 복원 원본은 `docs/issues/`에 보관한다.
+
 ## 마감일 운영
 
 - 공통 파일(`PROJECT_BRIEF`, 발표 본문, 데이터 계약, 빌드 설정)은 동시에 편집하지 않고 한 명이 통합한다.
