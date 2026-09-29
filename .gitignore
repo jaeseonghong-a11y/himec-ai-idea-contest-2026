@@ -24,6 +24,8 @@ dist/
 coverage/
 tmp/
 *.log
+__pycache__/
+*.pyc
 
 # Local source package; the extracted workflow kit is tracked.
 team-workflow-kit-*.zip
