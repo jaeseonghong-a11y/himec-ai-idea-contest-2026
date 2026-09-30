@@ -2,6 +2,8 @@
 
 ## 현재 상태 (2026-09-30, 팀장 AI)
 
+- 2026-09-30 박성훈(`archuni`)의 [PR #34](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/34)를 먼저 병합(`edb134e`)하고, `r03` 최종 SHA `5983ea95`의 2024 플러그인·PDF/JSON·합성 시험 자료를 [통합 PR #59](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/59)로 병합(`c7a3c0d`)했다. 중복 PR #50은 닫고 브랜치는 보존했다. 2026의 승인·실행 UI를 유지하며 PDF/JSON 내보내기를 추가했고, 김기준 관계도 편집기는 동일 도면의 핸들/축 연결과 불일치 시 수동 확인을 하도록 최소 보완했다. 확인: 공용 코어 net8.0/net48, 2026 Release 빌드(기존 WindowsBase 경고 1), 관계도 로직 47/47·118/118, 실제 팀원 JSON을 이용한 안전한 불러오기 테스트. 박성훈의 2024 호스트 결과는 `autocad-plugin/tests/SMOKE_TEST_2024.md`에 기록돼 있으나 이 PC에 2024가 없어 재검증하지 않았다. 실제 DWG→DXF 관계도 핸들 일치, 승인 후 이동/UNDO, 새 통합 UI의 2024/2026 호스트 확인은 미검증이다. 소스만 병합했으며 새 배포판은 아직 만들지 않았다. Recommended Next Step: 합성 시험 DWG를 DXF로 변환해 관계도를 생성하고 JSON의 #8E/X1-Y2가 같은 기둥에 닿는지 양쪽 버전 호스트에서 확인한 뒤 배포판을 만든다.
+
 - 2026-09-30 김기준 팀원의 `r03` 전체 작업을 보완한 [PR #57](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/57)을 검토 SHA `38a32e7`에서 squash 병합(`6a8226b`)했다. 사선 벽·보, 기둥 오프셋·보조 축, 시연 리허설과 PDF 지시 목록 연동을 보존했다. PDF 불러오기만으로 도면을 바꾸지 않도록 하고, DXF 직접 적용은 기둥 후보에 제한했으며, 누락 의존성·공개 도면 안내를 복구했다. 로직 새 도면 118/118·기존 도면 47/47, 대상 선택 단위 3/3, 기존 합성 전파 단위 5/5, 시연 A12M 10/10·왕복 17/17 및 NEW1 11/11·왕복 31/31, 개별 기둥 이동 R6 8/8을 확인했다. 실제 AutoCAD 2024 호스트와 전체 스트레스 조합은 이 통합에서 재검증하지 않았다. #17의 합성 A-101/A-301/E-201·대본·사이드카는 아직 미완료라 `work/kijun-0108/r04`로 재배정한다. 이 문서가 병합된 최신 `main`에서 r04를 만든다. 다른 팀원의 PR #34·#50과 `ehgudwns18/r02`는 유지한다. Recommended Next Step: 김기준 AI가 `prompts/TEAM_NEXT_ROUND.md`를 읽고 #17의 합성 DXF 1장·사이드카 1개를 먼저 공유한 뒤 나머지를 완성해 PR을 연다.
 
 - 2026-09-30 브랜치 정리 당시: 병합 완료 작업 브랜치 31개와 더 이상 사용하지 않는 Round 01 브랜치 2개를 원격에서 삭제했다. PR #14의 미병합 내용은 `archive/archuni-r01-20260930` 태그에 보존했다. 정리 직후 원격에는 `main`, 열린 PR #34의 `work/archuni/r02`, 열린 PR #50의 `work/archuni/r03`, 작업 커밋이 없는 `work/ehgudwns18/r02`만 남았고, 이후 김기준의 `r03`을 새로 배정했다. `BRANCH_ASSIGNMENTS.md`와 시작 프롬프트를 갱신했다.
@@ -17,7 +19,7 @@
 
 - 플러그인 후속 개선 [#37](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/37): [PR #38](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/38)의 HTTP 429 코드별 안내, 팔레트 최소 크기 완화, 단일 도면 식별자·명확한 상대 위치의 검토 전 자동 대상 제안, `선택된 객체 확인` 도면 강조를 `main`에 반영했다. 도면 이동은 별도 승인 전에는 일어나지 않는다. 실제 호스트 강조와 사용자 계정 429 원인은 여전히 미확정이다.
 
-- AutoCAD 2024 호환판: `archuni`에게 [#35](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/35)를 별도 배정했다. `work/archuni/r03`에서 2024 전용 .NET Framework 4.8 빌드·공존 번들·실제 호스트 검증을 진행한다. 기존 #18/PR #34는 유지한다. 2024 호환 기능은 아직 구현·검증되지 않았다.
+- AutoCAD 2024 호환판: [#35](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/35)의 소스는 통합 PR #59로 병합됐다. 박성훈 PC의 2024 호스트 스모크 기록은 있으나 통합 후 호스트 재검증과 정식 배포는 남았다.
 
 - 출품안 확정: `설계 변경 피드백 루프`, 분야 `설계·엔지니어링`. 기준 문서는 `docs/PROJECT_BRIEF.md`, 팀원 초안은 `HIMEC_아이디어_평가_및_워크플로우.md`.
 - 목표: 2026-09-30까지 합성 대본 → 구조화 변경 → PDF 주석 → 사람 승인 데모를 먼저 완성. 이어 승인된 C1 이동 한 건을 합성 DXF 2장에 반영·검사한다. 관계도는 선택 기능.
