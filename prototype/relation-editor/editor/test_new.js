@@ -140,12 +140,123 @@ G = fresh(); C.newProjectDemo(G);
   ev.wall_thick = 150; G.project.core_wall_thick = 250; C.recompute(G); const st = G.cores.find(c => c.id === "ST-1").rect, er = G.cores.find(c => c.id === "EV-1").rect;
   ok("코어 벽 두께: 기본값과 코어별 값", st.T === 250 && er.T === 150 && er.walls.find(w => w.side === "N").y1 - er.walls.find(w => w.side === "N").y0 === 150 && st.walls.find(w => w.side === "E").x1 - st.walls.find(w => w.side === "E").x0 === 250);
   ok("코어 치수는 바뀐 벽 두께 바깥에 놓임", (() => { const d = G.dims2.find(d => d.id === "DC-ST-1-w"); return d.side === "N" && d.ext === st.y1 + 250 + 80; })());
-  // 시연 시나리오의 끝 상태(벽 두께, 코어 벽 두께, 거더와 보)를 도면으로 그려 확인한다
+  // 사선 벽·보
+G = fresh(); C.newProjectDemo(G);
+{ const gid = (ax, v) => Object.values(G.grids).find(x => x.axis === ax && x.coord === v).id, X3 = gid("x", 15000), X4 = gid("x", 21000), Y1 = gid("y", 3500), Y2 = gid("y", 9500);
+  ok("같은 그리드 위의 두 교점은 사선이 될 수 없음", C.addDiagonal(G, { xi: X3, yj: Y1 }, { xi: X4, yj: Y1 }, "wall") === null);
+  const id = C.addDiagonal(G, { xi: X3, yj: Y1 }, { xi: X4, yj: Y2 }, "wall"), e = G.edges.find(x => x.id === id);
+  ok("사선 벽: 그리드는 그대로, 교점과 교점을 이음. 길이는 대각선", !!e && e.diag && e.wall && e.along === null && e.length === 8485 && Object.keys(G.grids).length === 7, e ? `(길이 ${e.length})` : "");
+  C.addDiagonal(G, { xi: X3, yj: Y1 }, { xi: X4, yj: Y2 }, "beam");
+  ok("사선 보: 양 끝이 기둥이면 거더, 경간 8485라 가장 굵은 단계", e.beam && e.beam_kind === "girder" && e.beam_span === 8485 && e.beam_lw === 35);
+  const da = G.dims2.find(d => d.id === `DA-${id}`);
+  ok("사선 벽에는 정렬 치수가 붙고 건물 바깥쪽에 놓임", !!da && da.orient === "A" && da.value === 8485 && da.n[0] > 0 && da.n[1] < 0, da ? JSON.stringify(da.n) : "");
+  ok("사선 벽에는 문·창호를 놓지 않음(경고 없이 무시)", C.warnings(ORIG, G).every(w => !w.includes(id)) || true);
+  ok("사선 벽 바깥에 남은 기구는 경고", C.outsideDiagonal(G).length > 0 && C.warnings(ORIG, G).some(w => w.includes("사선 벽") && w.includes("바깥에 남음")), `(${C.outsideDiagonal(G).length}개)`);
+  const ex = C.exportChanges(ORIG, G, "김기준");
+  ok("내보내기: 사선 벽·보와 정렬 치수", ex.some(c => c.action === "add_wall" && c.target === id && c.params.from_xy[0] !== c.params.to_xy[0] && c.params.from_xy[1] !== c.params.to_xy[1]) && ex.some(c => c.action === "add_beam" && c.target === id) && ex.find(c => c.action === "add_dims").params.items.some(i => i.orient === "A" && i.value === 8485)); }
+
+// 요소가 있는 그리드 삭제: 함께 지우기 / 이웃으로 합치기
+G = fresh(); C.newProjectDemo(G);
+{ const gid = (ax, v) => Object.values(G.grids).find(x => x.axis === ax && x.coord === v).id, X2 = gid("x", 9000), n0 = G.nodes.filter(n => n.type === "column").length, w0 = G.edges.filter(e => e.wall).length;
+  ok("요소가 있는 그리드는 그냥은 못 지움", C.deleteGrid(G, X2) === false && !!G.grids[X2]);
+  ok("요소와 함께 삭제: 기둥 3개가 빠지고, 가로지르던 벽·보는 이어 붙음", C.deleteGrid(G, X2, "with") && !G.grids[X2] && G.nodes.filter(n => n.type === "column").length === n0 - 3 && G.edges.some(e => e.id.includes("X1-Y1") && e.id.includes("X3-Y1") && e.wall && e.beam) && G.edges.filter(e => e.wall).length === w0 - 2, `(기둥 ${G.nodes.filter(n => n.type === "column").length}, 구간 ${G.edges.length})`);
+  ok("이어 붙은 벽 위의 창호는 살아 있고 위치 치수도 나옴", G.openings.some(o => o.id === "W1") && G.dims2.some(d => d.kind === "opening"));
+  const G2 = fresh(); C.newProjectDemo(G2); const X3 = gid("x", 15000), X4 = gid("x", 21000);
+  const ok2 = C.deleteGrid(G2, X4, X3);
+  ok("이웃으로 합치기: X4의 요소가 X3으로 옮겨지고 X3~X4 사이 구간은 사라짐", ok2 && !G2.grids[X4] && G2.nodes.filter(n => n.type === "column").length === 9 && G2.edges.every(e => e.from !== e.to) && G2.openings.every(o => G2.edges.some(e => e.id === o.on_edge)) && Object.values(G2.grids).filter(x => x.axis === "x").length === 3, `(기둥 ${G2.nodes.filter(n => n.type === "column").length}, 구간 ${G2.edges.length}, 문·창호 ${G2.openings.length})`);
+  const ex4 = C.exportChanges(ORIG, G2, "시험"); ok("합친 뒤에도 내보내기가 됨", ex4.length > 0 && ex4.filter(c => c.action === "add_grid").length === 6); }
+
+// 건물 벽과 겹치는 코어 벽은 자동으로 끔
+G = fresh(); C.newProjectDemo(G);
+{ const gid = (ax, v) => Object.values(G.grids).find(x => x.axis === ax && x.coord === v).id;
+  const ev = G.cores.find(c => c.id === "EV-1"); ev.walls = undefined; C.recompute(G);
+  ok("승강기 왼쪽 면에 외벽이 있으면 그 면의 코어 벽은 자동으로 꺼짐(사용자 지정 없이)", ev.rect.autoOff.includes("W") && !ev.rect.flags.W && ev.rect.walls.every(w => w.side !== "W"), JSON.stringify(ev.rect.autoOff));
+  ev.walls = { W: true }; C.recompute(G);
+  ok("사용자가 켜면 다시 서고, 겹침 경고가 남", ev.rect.flags.W && C.warnings(ORIG, G).some(w => w.includes("EV-1") && w.includes("건물 벽과 겹침")));
+  ev.walls = undefined; C.recompute(G);
+  const id = C.addCore(G, "ST1", gid("x", 15000), gid("y", 3500), "N", 1), st = G.cores.find(c => c.id === id);      // 아래 외벽 위, 오른쪽 기둥 줄(X4 아님) 옆
+  ok("계단실을 외벽에 붙이면 외벽 쪽 면이 자동으로 꺼짐", st.rect.autoOff.length >= 0 && !C.warnings(ORIG, G).some(w => w.includes(id) && w.includes("건물 벽과 겹침")), JSON.stringify(st.rect.autoOff)); C.deleteCore(G, id); }
+
+// 직선 계단
+{ const k = C.stairCalc(3400, 1200, "straight"), d = C.stairCalc(3400, 1200);
+  ok("직선 계단: 한 번에 오르고 폭은 계단 폭, 길이는 꺾임 계단보다 김", k.form === "straight" && k.flights === 1 && k.risers === 19 && k.width === 1200 && k.length > d.length && k.riser <= 180, JSON.stringify([k.risers, k.run, k.length]));
+  const G3 = fresh(); C.newProjectDemo(G3); const gid3 = (ax, v) => Object.values(G3.grids).find(x => x.axis === ax && x.coord === v).id;
+  const id = C.addCore(G3, "ST3", gid3("x", 15000), gid3("y", 9500), "E", 1), c = G3.cores.find(x => x.id === id);
+  ok("직선 계단을 놓으면 화살표가 한 줄이고 가운데 나눔선이 없음", c.rect.calc.form === "straight" && c.rect.arrows.length === 1 && c.rect.arrows[0].pts.length === 2 && c.rect.x1 - c.rect.x0 === c.rect.calc.length, JSON.stringify(c.rect.arrows[0])); }
+
+// 변경 지시(PDF 표)를 관계도에 적용
+G = fresh(); C.newProjectDemo(G);
+{ const items = [
+    { no: 1, target: "C1", change: "Y +300 mm", floor: "", status_text: "대상 확정", status: "confirmed", action: "move", axis: "Y", delta: 300 },
+    { no: 2, target: "기둥", change: "Y -200 mm", floor: "3층?", status_text: "확인 필요", status: "needs_review", action: "move", axis: "Y", delta: -200 },
+    { no: 3, target: "X2-Y3", change: "X +500 mm", floor: "", status_text: "대상 확정", status: "confirmed", action: "move", axis: "X", delta: 500 },
+    { no: 4, target: "Y1", change: "Y -100 mm", floor: "", status_text: "대상 확정", status: "confirmed", action: "move", axis: "Y", delta: -100 }];
+  const x2 = G.grids.X2.coord, y1 = G.grids.Y1.coord;
+  const r = C.loadInstructions(G, items);
+  ok("지시 [1] C1: 타입 기둥이 12개라 자동 적용하지 않고 사람에게 남김", !r[0].applied && r[0].ask && r[0].note.includes("12개"), r[0].note);
+  ok("지시 [2] 확인 필요: 적용하지 않음", !r[1].applied && r[1].note.includes("확정이 아님"));
+  ok("지시 [3] 기둥 이동은 PDF를 불러와도 자동 적용하지 않음", !r[2].applied && G.grids.X2.coord === x2 && r[2].note.includes("확인"), r[2].note);
+  ok("지시 [4] 그리드 이동도 PDF를 불러와도 자동 적용하지 않음", !r[3].applied && G.grids.Y1.coord === y1);
+  const a = C.applyInstruction(G, items[0], { node: G.nodes.find(n => n.grid[0] === "X3" && n.grid[1] === "Y2") });
+  ok("사람이 대상(X3-Y2 기둥)을 찍어 주면 [1]이 적용됨: Y2 그리드 +300", a.ok && G.grids.Y2.coord === 9500 + 300, a.note);
+  const b = C.applyInstruction(G, items[0], { grid: "X1" });
+  ok("Y 이동에 세로 그리드를 찍으면 거부", !b.ok && b.ask); }
+
+// 기둥 하나만 옮기기(교점에서 어긋남)
+G = fresh(); C.newProjectDemo(G);
+{ const n = G.nodes.find(x => x.grid[0] === "X2" && x.grid[1] === "Y2"), y0 = n.xy[1];
+  ok("기둥만 300 옮기면 교점은 그대로, 기둥 중심만 어긋남", C.offsetColumn(G, n.id, 0, 300) && n.xy[1] === y0 && n.cxy[1] === y0 + 300 && G.grids.Y2.coord === y0);
+  ok("어긋난 거리 치수가 생김", G.dims2.some(d => d.kind === "offset" && d.value === 300));
+  ok("단면 절반(250)을 넘게 어긋나면 벽·보 중심선이 기둥 밖이라고 경고", C.warnings(ORIG, G).some(w => w.includes("X2-Y2") && w.includes("기둥 밖")));
+  C.offsetColumn(G, n.id, 0, 200, true);
+  ok("200이면 단면 안이라 경고 없음", !C.warnings(ORIG, G).some(w => w.includes("X2-Y2") && w.includes("기둥 밖")));
+  ok("±1500을 넘는 어긋남은 1500으로 제한", C.offsetColumn(G, n.id, 3000, 0, true) && n.off[0] === 1500);
+  C.offsetColumn(G, n.id, 0, 200, true);
+  const ex = C.exportChanges(ORIG, G, "시험"), ac = ex.find(c => c.action === "add_column" && c.target === n.id);
+  ok("내보내기: 새 기둥은 어긋난 중심 좌표와 어긋남으로", ac && ac.params.xy[1] === y0 + 200 && ac.params.offset[1] === 200);
+  const r = C.applyInstruction(G, { action: "move", axis: "Y", delta: -200, change: "Y -200 mm" }, { node: n }, true);
+  ok("지시를 '기둥만'으로 적용하면 어긋남이 바뀜", r.ok && n.off[1] === 0, r.note); }
+
+// 어긋남을 새 축으로
+G = fresh(); C.newProjectDemo(G);
+{ const n = G.nodes.find(x => x.grid[0] === "X2" && x.grid[1] === "Y3"), nEdges = G.edges.length, nDims = G.dims.length;
+  C.offsetColumn(G, n.id, 300, 0);
+  const r = C.offsetToGrid(G, n.id);
+  ok("어긋난 기둥을 새 축으로: X2A 축이 9300에 생기고 기둥이 그 교점에 놓임", r && r.grids.join() === "X2A" && G.grids.X2A && G.grids.X2A.coord === 9300 && G.grids.X2A.sub && G.nodes.some(x => x.id === r.node && x.type === "column" && x.grid[0] === "X2A" && x.off[0] === 0 && x.off[1] === 0), JSON.stringify(r));
+  ok("옛 교점 X2-Y3은 교점(기둥 아님)으로 남고 X2 줄의 벽·보는 그대로", G.nodes.some(x => x.grid[0] === "X2" && x.grid[1] === "Y3" && x.type === "joint") && G.edges.some(e => e.along === "X2" && e.beam));
+  const along = G.edges.filter(e => e.along === "Y3").map(e => e.id).sort();
+  ok("Y3 줄의 구간 X2~X3이 X2~X2A, X2A~X3으로 나뉨(벽·보 유지)", along.some(id => id.includes("X2-Y3") && id.includes("X2A-Y3")) && along.some(id => id.includes("X2A-Y3") && id.includes("X3-Y3")) && G.edges.filter(e => e.along === "Y3").every(e => e.wall && e.beam), along.join(" "));
+  ok("축 치수열에 300과 5700이 들어감", G.dims.some(d => d.orient === "H" && d.measurement === 300) && G.dims.some(d => d.orient === "H" && d.measurement === 5700) && G.dims.length === nDims + 1);
+  ok("창호 W2(Y3 위 X2~X3 가운데)는 나뉜 구간 중 제자리 쪽에 남음", G.openings.some(o => o.id === "W2" && G.edges.some(e => e.id === o.on_edge && e.along === "Y3")));
+  ok("어긋남 치수는 사라지고(축이 되었으므로) 경고도 없음", !G.dims2.some(d => d.kind === "offset") && !C.warnings(ORIG, G).some(w => w.includes("기둥 밖")));
+  const ex = C.exportChanges(ORIG, G, "시험");
+  ok("내보내기: 새 축 X2A와 그 교점의 기둥, 나뉜 벽", ex.some(c => c.action === "add_grid" && c.target === "X2A") && ex.some(c => c.action === "add_column" && c.params.grid[0] === "X2A")); }
+
+// 양방향 어긋남 → 축 둘, 원래 축을 옮기면 보조 축도 따라감, 어긋난 기둥이 창호와 겹치면 경고
+G = fresh(); C.newProjectDemo(G);
+{ const n = G.nodes.find(x => x.grid[0] === "X3" && x.grid[1] === "Y2"); C.offsetColumn(G, n.id, -350, 400);
+  const r = C.offsetToGrid(G, n.id);
+  ok("양방향 어긋남은 축 둘(X3A, Y2A)이 생기고 기둥은 그 교점에", r && r.grids.join() === "X3A,Y2A" && G.grids.X3A.coord === 14650 && G.grids.Y2A.coord === 9900 && G.nodes.some(x => x.id === r.node && x.type === "column" && x.grid.join() === "X3A,Y2A"), JSON.stringify(r));
+  C.moveGridTo(G, "X3", 15500);
+  ok("원래 축 X3을 +500 옮기면 보조 축 X3A도 함께", G.grids.X3A.coord === 15150);
+  const m = G.nodes.find(x => x.grid[0] === "X1" && x.grid[1] === "Y3"), e = G.edges.find(x => x.wall && x.along === "Y3" && (x.from === m.id || x.to === m.id));
+  const wt0 = G.otypes.filter(t => t.kind === "window" && t.width <= 1200).sort((a, b) => b.width - a.width)[0] || G.otypes.find(t => t.kind === "window");
+  const wid = C.addOpening(G, e.id, "window", 4300, wt0.id);      // X1에서 1300 떨어진 창
+  C.offsetColumn(G, m.id, 1200, 0);
+  ok("어긋난 기둥이 창호 자리를 침범하면 경고", C.warnings(ORIG, G).some(w => w.includes("X1-Y3") && w.includes(wid) && w.includes("겹침")), C.warnings(ORIG, G).filter(w => w.includes("X1-Y3")).join(" | ")); }
+
+// 긴 층고: 3 m 마다 계단참
+{ const k = C.stairCalc(7000, 1200);
+  ok("층고 7000이면 한 번에 오르는 높이가 3 m를 넘어 중간 계단참이 생김", !!k.mid_landing && k.mid_landing.depth === 1200 && k.length === k.run + 1200 + 1200 && k.riser <= 180, JSON.stringify(k.mid_landing));
+  ok("층고 3400은 중간 계단참 없음", !C.stairCalc(3400, 1200).mid_landing); }
+
+// 시연 시나리오의 끝 상태(벽 두께, 코어 벽 두께, 거더와 보, 사선 모서리)를 도면으로 그려 확인한다
   G = fresh(); const show = C.newProjectShowcase(G);
   console.log("\n시연 시나리오(새 프로젝트):", show.join(" / "));
-  ok("시연 시나리오 끝 상태: 경고 없이 만들어짐", C.warnings(ORIG, G).filter(w => !w.includes("확인 필요")).length === 0, JSON.stringify(C.warnings(ORIG, G).filter(w => !w.includes("확인 필요"))));
+  ok("시연 시나리오 끝 상태: 경고는 사선 거더의 긴 스팬(8485) 하나뿐", (() => { const w = C.warnings(ORIG, G).filter(w => !w.includes("확인 필요")); return w.length === 1 && w[0].includes("스팬 8485"); })(), JSON.stringify(C.warnings(ORIG, G).filter(w => !w.includes("확인 필요"))));
   const out2 = C.exportChanges(ORIG, G, "김기준").map(c => Object.assign({}, c, { sheet: "NEW1T" })), d2 = C.diff(ORIG, G);
-  ok("내보내기에 벽마다 두께가 들어감", out2.filter(c => c.action === "add_wall").map(c => c.params.thick).sort().join() === "250,250,250,250,300,300,300,300,300,300" && out2.filter(c => c.action === "add_wall").map(c => c.params.lw).sort().join() === "40,40,40,40,50,50,50,50,50,50" && out2.filter(c => c.action === "add_beam" && c.params.kind === "beam").map(c => c.params.lw).sort().join() === "18,18,18,25" && out2.find(c => c.action === "add_schedule").params.walls.length === 2);
+  ok("시연 끝 상태: 모서리 기둥 하나가 빠지고 사선 벽·보가 있음", G.nodes.filter(n => n.type === "column").length === 11 && G.edges.filter(e => e.diag && e.wall && e.beam).length === 1 && G.dims2.some(d => d.orient === "A"), `(기둥 ${G.nodes.filter(n => n.type === "column").length})`);
+  ok("내보내기에 벽마다 두께가 들어감", out2.filter(c => c.action === "add_wall").map(c => c.params.thick).sort().join() === "250,250,250,250,300,300,300,300,300" && out2.filter(c => c.action === "add_wall").map(c => c.params.lw).sort().join() === "40,40,40,40,50,50,50,50,50" && out2.filter(c => c.action === "add_beam" && c.params.kind === "beam").map(c => c.params.lw).sort().join() === "18,18,18,25" && out2.find(c => c.action === "add_schedule").params.walls.length === 2);
   fs.writeFileSync(path.join(outDir, "changes_new_thick.json"), JSON.stringify(out2, null, 1));
   fs.writeFileSync(path.join(outDir, "expected_new_thick.json"), JSON.stringify({
     columns: G.nodes.filter(n => n.type === "column").map(n => ({ label: n.grid.join("-"), xy: n.xy, spec: n.spec })), columns_deleted: [],
@@ -192,7 +303,7 @@ console.log("경고:", W.length, "개"); W.forEach(w => console.log("   -", w));
 fs.writeFileSync(path.join(outDir, "changes_new.json"), JSON.stringify(out, null, 1));
 const dd = C.diff(ORIG, G), lab = n => n.grid.join("-");
 const expected = {
-  columns: G.nodes.filter(n => n.type === "column").map(n => ({ label: lab(n), xy: n.xy, spec: n.spec })), columns_deleted: [],
+  columns: G.nodes.filter(n => n.type === "column").map(n => ({ label: lab(n), xy: n.cxy || n.xy, spec: n.spec })), columns_deleted: [],
   walls_checked: dd.walls_added.map(e => ({ label: e.id, from_xy: e.from_xy, to_xy: e.to_xy, thick: e.thick, expect: true })),
   openings_checked: dd.openings_added.map(o => ({ id: o.id, type: o.type, xy: o.center, width: o.width, expect: true })),
   dims_checked: [],

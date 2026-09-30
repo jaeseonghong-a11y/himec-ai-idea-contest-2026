@@ -1,8 +1,9 @@
 """시연 시나리오 문서에 넣을 그림을 만든다: 편집기 화면(Edge), 도면 전후 비교, AutoCAD 출력.
 
-먼저 tools/setup_from_drawings.sh, tools/check_all.sh, 그리고
-  python propagate/apply_edits.py A12M out/editor/changes_demo.json out/editor/expected_demo.json
-을 돌려 out/ 을 채운 뒤 실행한다. AutoCAD 출력 그림은 tools/verify_generated_autocad.py 가 만든 것이 있으면 쓴다.
+먼저 tools/setup_from_drawings.sh, tools/check_all.sh, 그리고 python tools/rehearse.py 를 돌려 out/ 을 채운 뒤 실행한다.
+도면 전후 그림은 마지막으로 반영한 결과(리허설 1부)에서, AutoCAD 출력 그림은
+  python tools/verify_generated_autocad.py NEW1 out/rehearsal/expected_NEW1.json
+이 만든 out/real/NEW1_autocad.pdf 에서 가져온다. 리허설 단계별 화면은 scenario/rehearsal/ 로 복사한다.
 """
 import shutil
 import subprocess
@@ -33,7 +34,13 @@ for name, src in COPY:
         print(name, p.stat().st_size // 1024, "KB")
     else:
         print(name, "없음:", src)
-pdf = ROOT / "out" / "real" / "NEW1T_autocad.pdf"
+REH = ROOT / "out" / "rehearsal"
+(DST / "rehearsal").mkdir(exist_ok=True)
+n = 0
+for src in sorted(REH.glob("*_step*.png")):
+    shutil.copyfile(src, DST / "rehearsal" / src.name.replace("A12M_", "a_").replace("NEW1_", "b_")); n += 1
+print(f"리허설 화면 {n}장" if n else "리허설 화면 없음: python tools/rehearse.py 를 먼저 실행")
+pdf = next((q for q in (ROOT / "out" / "real" / "NEW1_autocad.pdf", ROOT / "out" / "real" / "NEW1T_autocad.pdf") if q.exists()), ROOT / "out" / "real" / "NEW1_autocad.pdf")
 if pdf.exists():
     import pymupdf
     pg = pymupdf.open(pdf)[0]
@@ -43,6 +50,7 @@ if pdf.exists():
     pg.get_pixmap(dpi=380, clip=pymupdf.Rect(r.width * 0.13, r.height * 0.30, r.width * 0.29, r.height * 0.52)).save(str(DST / "b6_walls.png"))
     pg.get_pixmap(dpi=300, clip=pymupdf.Rect(r.width * 0.20, r.height * 0.42, r.width * 0.50, r.height * 0.64)).save(str(DST / "b7_lineweights.png"))
     pg.get_pixmap(dpi=170, clip=pymupdf.Rect(r.width * 0.58, r.height * 0.2, r.width * 0.97, r.height * 0.6)).save(str(DST / "b8_schedules.png"))
-    print("AutoCAD 출력 그림 5장")
+    pg.get_pixmap(dpi=300, clip=pymupdf.Rect(r.width * 0.31, r.height * 0.45, r.width * 0.50, r.height * 0.67)).save(str(DST / "b9_diagonal.png"))
+    print("AutoCAD 출력 그림 6장")
 else:
-    print("AutoCAD 출력(NEW1T_autocad.pdf)이 없어 건너뜀. python tools/verify_generated_autocad.py NEW1T 를 먼저 실행")
+    print("AutoCAD 출력(NEW1_autocad.pdf)이 없어 건너뜀. python tools/verify_generated_autocad.py NEW1 out/rehearsal/expected_NEW1.json 을 먼저 실행")

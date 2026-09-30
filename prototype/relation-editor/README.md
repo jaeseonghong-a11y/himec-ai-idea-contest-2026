@@ -15,7 +15,7 @@ HIMEC AI 아이디어 공모전 데모. 도면을 "형태"가 아니라 "관계"
 ## 설치
 
 ```text
-pip install ezdxf networkx matplotlib pywin32
+pip install -r requirements.txt
 ```
 
 ## A. 합성 도면 데모 (태그 블록 기반)

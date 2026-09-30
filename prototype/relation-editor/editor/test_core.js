@@ -133,7 +133,7 @@ fs.writeFileSync(path.join(outDir, "changes_demo.json"), JSON.stringify(out, nul
 // 왕복 검증용 기대값: 편집기의 최종 상태
 const dd = C.diff(ORIG, G), N = C.idx(G.nodes), lab = n => n.grid.join("-");
 const expected = {
-  columns: G.nodes.filter(n => n.type === "column").map(n => ({ label: lab(n), xy: n.xy, spec: n.spec })),
+  columns: G.nodes.filter(n => n.type === "column").map(n => ({ label: lab(n), xy: n.cxy || n.xy, spec: n.spec })),
   columns_deleted: dd.cols_deleted.map(c => ({ label: c.grid.join("-"), xy: c.xy })),
   walls_checked: [...dd.walls_added.map(e => ({ label: e.id, from_xy: e.from_xy, to_xy: e.to_xy, expect: true })), ...dd.walls_deleted.map(e => ({ label: e.id, from_xy: e.from_xy, to_xy: e.to_xy, expect: false }))],
   openings_checked: [...dd.openings_added.map(o => ({ id: o.id, type: o.type, xy: o.center, width: o.width, expect: true })),
@@ -152,5 +152,14 @@ if (G.mep) {
   out[out.length - 1].warnings.forEach(w => console.log("   -", w));
 }
 fs.writeFileSync(path.join(outDir, "expected_demo.json"), JSON.stringify(expected, null, 1));
+
+// 플러그인 PDF의 대상 "C1 #8E" 꼴(태그 + DXF 객체 핸들): 핸들이 이 도면의 기둥이면 바로 그 기둥, 아니면 태그로
+{ const H = C.initModel(C.ORIG_GRAPH), col = H.nodes.find(n => n.type === "column" && n.handle), gy = col.grid[1], y0 = H.grids[gy].coord;
+  const r1 = C.resolveInstruction(H, { target: `C1 #${col.handle.toLowerCase()}` });
+  ok("핸들이 있는 지시: 태그 C1과 무관하게 그 핸들의 기둥을 찾음(대소문자 무시)", r1.node && r1.node.id === col.id && r1.by === "handle", JSON.stringify(r1.node && r1.node.id));
+  const r2 = C.resolveInstruction(H, { target: "C1 #8E", tag: "C1", handle: "8E" });
+  ok("핸들 #8E는 이 도면에 없음 → 타입 C1 기둥이 여러 개라 사람에게 남기고 핸들이 없다고 알림", r2.ask && r2.ask.includes("#8E") && r2.ask.includes("C1"), r2.ask);
+  const a = C.applyInstruction(H, { target: `C1 #${col.handle}`, change: "Y +300 mm", action: "move", axis: "Y", delta: 300 });
+  ok("핸들로 찾은 기둥의 Y +300: 그 기둥이 놓인 가로 그리드가 +300", a.ok && H.grids[gy].coord === y0 + 300, a.note); }
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
