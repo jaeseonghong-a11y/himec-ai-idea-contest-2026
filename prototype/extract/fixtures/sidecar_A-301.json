@@ -1,0 +1,13 @@
+{
+  "_note": "B 단계 재현용 임시 합성 사이드카입니다. B12는 PDF 좌표가 없어 위치 미확정 경고 경로를 재현합니다.",
+  "schema_version": 1,
+  "sheet_id": "A-301",
+  "source_dxf": "samples/A-301.dxf",
+  "source_pdf": "samples/A-301.pdf",
+  "unit": "mm",
+  "coordinate_system": "synthetic_pdf_points",
+  "objects": [
+    {"handle": "2A", "tag": "C1", "type": "INSERT", "layer": "COLUMN", "xy_mm": [1000, 400], "pdf_page": 0, "pdf_rect_pt": [90, 200, 120, 240]},
+    {"handle": "2B", "tag": "B12", "type": "INSERT", "layer": "BEAM", "xy_mm": [1000, 2600], "pdf_page": null, "pdf_rect_pt": null}
+  ]
+}
