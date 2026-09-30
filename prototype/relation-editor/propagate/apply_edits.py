@@ -1025,19 +1025,26 @@ def roundtrip(dst, sheet, expected_path):
             a, b = sorted((p1[0], p2[0]) if hz else (p1[1], p2[1]))
             if b > s + 10 and a < e - 10:
                 iv.append((a, b, t))
+        cols = [((n.get("col_xy") or n["xy"]), [float(v) for v in n["spec"].split("x")]) for n in g["nodes"] if n["type"] == "column"]
+        def in_column(lo, hi):      # 빈 구간이 기둥 속이면(기둥이 벽을 대신) 이어진 것으로 본다
+            return any((c[1] - sp[1] / 2 - 10 <= c0 <= c[1] + sp[1] / 2 + 10 and c[0] - sp[0] / 2 - 10 <= lo and hi <= c[0] + sp[0] / 2 + 10) if hz else
+                       (c[0] - sp[0] / 2 - 10 <= c0 <= c[0] + sp[0] / 2 + 10 and c[1] - sp[1] / 2 - 10 <= lo and hi <= c[1] + sp[1] / 2 + 10) for c, sp in cols)
         cur = s
         for a, b, t in sorted(iv, key=lambda v: v[:2]):
-            if a > cur + 10:
+            if a > cur + 10 and not in_column(cur, a):
                 return False, None
             cur = max(cur, b)
-        ts = {t for _, _, t in iv}
+        if cur < e - 10 and in_column(cur, e):
+            cur = e
+        ts = {t for _, _, t in iv if t is not None}      # 짧은 토막은 두께를 못 재므로 잰 것만 본다
         return (cur >= e - 10 and bool(iv)), (ts.pop() if len(ts) == 1 else None)
 
     def has_wall(w):
         return chain(w)[0] or any((near(a, w["from_xy"], 10) and near(b, w["to_xy"], 10)) or (near(a, w["to_xy"], 10) and near(b, w["from_xy"], 10)) for a, b in got_walls)
     for w in exp["walls_checked"]:
         got = has_wall(w)
-        if w["expect"] and w.get("thick"):      # 두께까지 대조
+        short = math.hypot(w["to_xy"][0] - w["from_xy"][0], w["to_xy"][1] - w["from_xy"][1]) < 600      # 짧은 토막(기둥 면 사이가 거의 없음)은 두께를 잴 수 없다
+        if w["expect"] and w.get("thick") and not short:      # 두께까지 대조
             tm = thick_of(w) or chain(w)[1]
             good = got and tm is not None and abs(tm - w["thick"]) <= 1
             rows.append(("벽 " + w["label"], f'있음, 두께 {w["thick"]}', f'있음, 두께 {tm}' if got else "없음", good)); ok_all &= good

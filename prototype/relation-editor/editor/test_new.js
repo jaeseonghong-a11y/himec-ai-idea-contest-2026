@@ -217,6 +217,21 @@ G = fresh(); C.newProjectDemo(G);
   const r = C.applyInstruction(G, { action: "move", axis: "Y", delta: -200, change: "Y -200 mm" }, { node: n }, true);
   ok("지시를 '기둥만'으로 적용하면 어긋남이 바뀜", r.ok && n.off[1] === 0, r.note); }
 
+// 어긋남을 새 축으로
+G = fresh(); C.newProjectDemo(G);
+{ const n = G.nodes.find(x => x.grid[0] === "X2" && x.grid[1] === "Y3"), nEdges = G.edges.length, nDims = G.dims.length;
+  C.offsetColumn(G, n.id, 300, 0);
+  const r = C.offsetToGrid(G, n.id);
+  ok("어긋난 기둥을 새 축으로: X2A 축이 9300에 생기고 기둥이 그 교점에 놓임", r && r.grids.join() === "X2A" && G.grids.X2A && G.grids.X2A.coord === 9300 && G.grids.X2A.sub && G.nodes.some(x => x.id === r.node && x.type === "column" && x.grid[0] === "X2A" && x.off[0] === 0 && x.off[1] === 0), JSON.stringify(r));
+  ok("옛 교점 X2-Y3은 교점(기둥 아님)으로 남고 X2 줄의 벽·보는 그대로", G.nodes.some(x => x.grid[0] === "X2" && x.grid[1] === "Y3" && x.type === "joint") && G.edges.some(e => e.along === "X2" && e.beam));
+  const along = G.edges.filter(e => e.along === "Y3").map(e => e.id).sort();
+  ok("Y3 줄의 구간 X2~X3이 X2~X2A, X2A~X3으로 나뉨(벽·보 유지)", along.some(id => id.includes("X2-Y3") && id.includes("X2A-Y3")) && along.some(id => id.includes("X2A-Y3") && id.includes("X3-Y3")) && G.edges.filter(e => e.along === "Y3").every(e => e.wall && e.beam), along.join(" "));
+  ok("축 치수열에 300과 5700이 들어감", G.dims.some(d => d.orient === "H" && d.measurement === 300) && G.dims.some(d => d.orient === "H" && d.measurement === 5700) && G.dims.length === nDims + 1);
+  ok("창호 W2(Y3 위 X2~X3 가운데)는 나뉜 구간 중 제자리 쪽에 남음", G.openings.some(o => o.id === "W2" && G.edges.some(e => e.id === o.on_edge && e.along === "Y3")));
+  ok("어긋남 치수는 사라지고(축이 되었으므로) 경고도 없음", !G.dims2.some(d => d.kind === "offset") && !C.warnings(ORIG, G).some(w => w.includes("기둥 밖")));
+  const ex = C.exportChanges(ORIG, G, "시험");
+  ok("내보내기: 새 축 X2A와 그 교점의 기둥, 나뉜 벽", ex.some(c => c.action === "add_grid" && c.target === "X2A") && ex.some(c => c.action === "add_column" && c.params.grid[0] === "X2A")); }
+
 // 긴 층고: 3 m 마다 계단참
 { const k = C.stairCalc(7000, 1200);
   ok("층고 7000이면 한 번에 오르는 높이가 3 m를 넘어 중간 계단참이 생김", !!k.mid_landing && k.mid_landing.depth === 1200 && k.length === k.run + 1200 + 1200 && k.riser <= 180, JSON.stringify(k.mid_landing));

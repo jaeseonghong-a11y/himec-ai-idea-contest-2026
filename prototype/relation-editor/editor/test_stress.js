@@ -168,5 +168,15 @@ function save(G, name, label) {
   C.offsetColumn(G, a.id, 0, 300); C.offsetColumn(G, b.id, -400, 250);
   save(G, "S10", "X2-Y1 기둥만 위로 300(외벽을 따라), X3-Y2 기둥만 (-400, 250)");
 }
+// ---------- S11: 어긋난 기둥을 새 축으로 (X2-Y3 오른쪽 300, X3-Y1 아래... 위 250) ----------
+{
+  const G = fresh(); C.newProjectDemo(G);
+  const a = G.nodes.find(n => n.grid[0] === "X2" && n.grid[1] === "Y3"), b = G.nodes.find(n => n.grid[0] === "X3" && n.grid[1] === "Y1");
+  C.offsetColumn(G, a.id, 300, 0); const r1 = C.offsetToGrid(G, a.id);
+  C.offsetColumn(G, b.id, 0, 250); const r2 = C.offsetToGrid(G, b.id);
+  if (!r1 || !r2) note("S11", "이상", "새 축 만들기 실패");
+  save(G, "S11", `새 축 ${r1 && r1.grids} (X2에서 +300), ${r2 && r2.grids} (Y1에서 +250)`);
+  if (!G.dims.some(d => d.measurement === 300) || !G.dims.some(d => d.measurement === 250)) note("S11", "이상", "새 축의 치수가 치수열에 없음");
+}
 fs.writeFileSync(path.join(outDir, "findings_js.json"), JSON.stringify(findings, null, 1));
 console.log(`\n편집기 쪽 발견 ${findings.length}건. 이어서: python tools/stress_run.py`);

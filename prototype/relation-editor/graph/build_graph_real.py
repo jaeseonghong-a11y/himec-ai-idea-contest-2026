@@ -452,9 +452,11 @@ def build(dxf_path: Path, sheet: str):
                                  "spec": f'{int(c["w"])}x{int(c["h"])}', "handle": c["handle"], "layer": "COL"}
 
     col_faces = set()
-    for c in rect_polys(msp, "COL"):      # 기둥 면의 좌표(개구부 폭을 잴 때 기둥 사이를 벽체 개구부로 보지 않기 위해)
+    col_rects = rect_polys(msp, "COL")
+    for c in col_rects:      # 기둥 면의 좌표(개구부 폭을 잴 때 기둥 사이를 벽체 개구부로 보지 않기 위해)
         col_faces |= {round(c["cx"] - c["w"] / 2), round(c["cx"] + c["w"] / 2), round(c["cy"] - c["h"] / 2), round(c["cy"] + c["h"] / 2)}
     wall_segs = segments_of(msp, WALL_LAYERS)
+    wall_segs_nocol = segments_of(msp, tuple(l for l in WALL_LAYERS if l != "COL"))      # 짧은 구간은 기둥 면(COL)을 벽 증거로 세지 않는다
     win_segs = segments_of(msp, WIN_LAYERS)
     wal_only = segments_of(msp, ("WAL",))
 
@@ -489,7 +491,18 @@ def build(dxf_path: Path, sheet: str):
                 a, b = joints[ka]["xy"], joints[kb]["xy"]
                 axis_h = axis == "y"
                 rivals = [g2["coord"] for g2 in gmap.values() if g2["id"] != gid]
-                wc, wh, _, _ = coverage(a, b, axis_h, wall_segs, WALL_OFF, rivals)
+                short = dist(a, b) < 600
+                wc, wh, _, _ = coverage(a, b, axis_h, wall_segs_nocol if short else wall_segs, WALL_OFF, rivals)
+                if short:      # 짧은 구간: 기둥 면 대신 '기둥 속을 지나는 길이'를 더한다 (옆에 서 있는 기둥의 면에 속지 않도록)
+                    lo, hi = (min(a[0], b[0]), max(a[0], b[0])) if axis_h else (min(a[1], b[1]), max(a[1], b[1]))
+                    q = a[1] if axis_h else a[0]
+                    inside = 0.0
+                    for c in col_rects:
+                        (ql, qh), (pl, ph) = ((c["cy"] - c["h"] / 2, c["cy"] + c["h"] / 2), (c["cx"] - c["w"] / 2, c["cx"] + c["w"] / 2)) if axis_h else ((c["cx"] - c["w"] / 2, c["cx"] + c["w"] / 2), (c["cy"] - c["h"] / 2, c["cy"] + c["h"] / 2))
+                        if ql - 1 <= q <= qh + 1:
+                            inside += max(0.0, min(hi, ph) - max(lo, pl))
+                    if wc > 0 or inside >= (hi - lo) * 0.5:
+                        wc = min(1.0, wc + inside / max(1.0, hi - lo))
                 hc, hh, _, _ = coverage(a, b, axis_h, hid_segs, WALL_OFF, rivals)
                 both_col = ka in columns and kb in columns
                 is_wall = bool(wc >= WALL_MIN_COVER)
