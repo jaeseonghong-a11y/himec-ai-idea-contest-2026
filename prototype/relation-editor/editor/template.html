@@ -1001,7 +1001,8 @@ function rawWarnings(orig, g) {
     if (Math.abs(n.off[0]) > sp.w / 2 - 50 && g.edges.some(e => (e.wall || e.beam) && e.along === n.grid[0] && (e.from === n.id || e.to === n.id))) bad.push(`${n.grid[0]} 줄의 벽·보 중심선이 기둥 밖(가로 ${Math.abs(n.off[0])} 어긋남, 단면 ${sp.w})`);
     if (Math.abs(n.off[1]) > sp.h / 2 - 50 && g.edges.some(e => (e.wall || e.beam) && e.along === n.grid[1] && (e.from === n.id || e.to === n.id))) bad.push(`${n.grid[1]} 줄의 벽·보 중심선이 기둥 밖(세로 ${Math.abs(n.off[1])} 어긋남, 단면 ${sp.h})`);
     if (bad.length) w.push(`기둥 ${n.grid.join("-")}: ${bad.join("; ")}. 구조 검토`);
-    g.openings.forEach(o => { const hw = o.width / 2, ob = o.horiz ? [o.xy[0] - hw, o.xy[1] - 200, o.xy[0] + hw, o.xy[1] + 200] : [o.xy[0] - 200, o.xy[1] - hw, o.xy[0] + 200, o.xy[1] + hw];
+    g.openings.forEach(o => { if (o.band) return;      // 상가 전면의 문 띠는 기둥 사이 전체라 겹침으로 보지 않는다
+      const hw = o.width / 2, ob = o.horiz ? [o.xy[0] - hw, o.xy[1] - 200, o.xy[0] + hw, o.xy[1] + 200] : [o.xy[0] - 200, o.xy[1] - hw, o.xy[0] + 200, o.xy[1] + hw];
       if (n.cxy[0] + sp.w / 2 > ob[0] && n.cxy[0] - sp.w / 2 < ob[2] && n.cxy[1] + sp.h / 2 > ob[1] && n.cxy[1] - sp.h / 2 < ob[3]) w.push(`기둥 ${n.grid.join("-")}: 옮긴 자리가 ${o.type === "door" ? "문" : "창호"} ${o.id}와 겹침. 기둥이나 ${o.type === "door" ? "문" : "창호"}을 옮겨야 함`); }); });
   { const N2 = idx(g.nodes), seen = new Set();      // 벽 두께
     g.edges.filter(e => e.wall && !e.diag).forEach(e => { [e.from, e.to].forEach(id => { const n = N2[id]; if (!n || n.type !== "column" || !n.spec) return; const sp = parseSpec(n.spec), lim = g.grids[e.along].axis === "y" ? sp.h : sp.w;
@@ -1833,6 +1834,86 @@ if (typeof module !== "undefined") module.exports = { offsetToGrid, offsetColumn
     document.body.appendChild(pre); document.title = `SELFTEST ${pass}/${out.length}`;
   }
   if (location.hash.includes("selftest")) (ORIG.source === "blank" ? runSelfTestNew : runSelfTest)();
+  // ----- 리허설: 시연 대본(시연_시나리오.md)의 단계를 화면 조작 그대로 진행한다. #rehearsal=3 이면 3단계까지 -----
+  function rehearsalSteps() {
+    const center = el => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+    const toClient = (x, y) => { const q = new DOMPoint(x, -y).matrixTransform(svg.getScreenCTM()); return { x: q.x, y: q.y }; };
+    const fire = (el, type, pt) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: pt.x, clientY: pt.y, pointerId: 1 }));
+    const click = (el, pt) => { fire(el, "pointerdown", pt); fire(window, "pointerup", pt); };
+    const q = sel_ => svg.querySelector(sel_), qa = sel_ => [...svg.querySelectorAll(sel_)];
+    const setMode = m => document.querySelector(`#tools button[data-mode="${m}"]`).click();
+    const pick = (kind, id) => { const el = q(`[data-kind="${kind}"][data-id="${id}"]`); if (!el) throw new Error(`${kind} ${id} 없음`); click(el, center(el)); };
+    const set = (id, v) => { const el = $(id); if (!el) throw new Error(`#${id} 없음`); el.value = v; el.dispatchEvent(new Event("change")); };
+    const N = () => idx(G.nodes), nodeAtG = (x, y) => G.nodes.find(n => n.grid[0] === x && n.grid[1] === y);
+    const segAt = (a, b) => { const i = candidateSegments(G).findIndex(sg => (sg.a.xi === a[0] && sg.a.yj === a[1] && sg.b.xi === b[0] && sg.b.yj === b[1]) || (sg.a.xi === b[0] && sg.a.yj === b[1] && sg.b.xi === a[0] && sg.b.yj === a[1])); const el = q(`[data-kind="cand-seg"][data-i="${i}"]`); if (!el) throw new Error(`구간 ${a}~${b} 후보 없음`); click(el, center(el)); };
+    const wallAt = (a, b) => G.edges.find(e => e.wall && ((N()[e.from].grid.join() === a.join() && N()[e.to].grid.join() === b.join()) || (N()[e.from].grid.join() === b.join() && N()[e.to].grid.join() === a.join())));
+    const alongPt = (e, t) => { const A = N()[e.from].xy, B = N()[e.to].xy; return [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t]; };
+    const openOn = (mode, e, t) => { setMode(mode); const el = q(`[data-kind="cand-wall"][data-id="${CSS.escape(e.id)}"]`); if (!el) throw new Error(`벽 ${e.id} 후보 없음`); const p = alongPt(e, t); click(el, toClient(p[0], p[1])); };
+    const S = [];
+    if (ORIG.source !== "blank") {      // ===== 1부: 있는 도면을 고친다 =====
+      S.push(["0. 도면을 읽은 관계도", () => { sel = null; render(); }, () => Object.keys(G.grids).length >= 10]);
+      S.push(["1. X6 그리드를 클릭하고 이동량 500 적용", () => { pick("grid", "X6"); set("inDelta", 500); $("btnApplyDelta").click(); }, () => G.grids.X6.coord === ORIG.grids.X6.coord + 500]);
+      S.push(["2-1. 창호 W2를 클릭하고 타입 WT3(900)으로", () => { pick("opening", "W2"); set("inOT", "WT3"); }, () => G.openings.find(o => o.id === "W2").otype === "WT3"]);
+      S.push(["2-2. 문 D1을 클릭하고 타입 DT4(900)으로", () => { pick("opening", "D1"); set("inOT", "DT4"); }, () => G.openings.find(o => o.id === "D1").otype === "DT4"]);
+      S.push(["2-3. 문 D3을 클릭하고 삭제", () => { pick("opening", "D3"); $("btnDel").click(); }, () => !G.openings.some(o => o.id === "D3")]);
+      S.push(["3-1. 전기·설비·소방 켜기", () => { document.querySelectorAll("#discToggles input").forEach(c => { if (!c.checked) { c.checked = true; c.dispatchEvent(new Event("change")); } }); }, () => true]);
+      S.push(["3-2. + 벽: X6 위 Y2~Y4 구간 클릭", () => { setMode("wall"); segAt(["X6", "Y2"], ["X6", "Y4"]); }, () => !!wallAt(["X6", "Y2"], ["X6", "Y4"])]);
+      S.push(["3-3. + 문: 아래쪽 벽(Y1)의 콘센트 자리 클릭", () => { const e = G.edges.find(x => x.wall && x.along === "Y1" && !x.diag && G.mep.devices.some(d => d.host && d.host.kind === "wall" && d.host.edge === x.id)); const d = G.mep.devices.find(d => d.host && d.host.kind === "wall" && d.host.edge === e.id); const A = N()[e.from].xy, B = N()[e.to].xy; const t = (d.a - Math.min(A[0], B[0])) / Math.abs(B[0] - A[0]); openOn("door", e, A[0] < B[0] ? t : 1 - t); }, () => G.openings.some(o => o.added && o.type === "door")]);
+      S.push(["4. 기둥 X7-Y9를 클릭하고 삭제", () => { setMode("select"); pick("column", nodeAtG("X7", "Y9").id); $("btnDel").click(); }, () => !nodeAtG("X7", "Y9") || nodeAtG("X7", "Y9").type !== "column"]);
+      S.push(["5. 검토자 이름을 쓰고 변경 내보내기", () => { $("reviewer").value = "리허설"; sel = null; render(); }, () => exportChanges(ORIG, G, "리허설").length >= 8]);
+    } else {                            // ===== 2부: 백지에서 새로 그린다 =====
+      S.push(["1-1. 사각형 대지 26000 x 19000 만들기", () => { set("inSW", 26000); set("inSD", 19000); $("btnSiteRect").click(); }, () => !!G.site]);
+      S.push(["1-2. 그리드 한 번에 만들기 (X 3000 + 6000,6000,6000 / Y 3500 + 6000,6000)", () => { $("inGX0").value = 3000; $("inGXs").value = "6000,6000,6000"; $("inGY0").value = 3500; $("inGYs").value = "6000,6000"; $("btnGridSeries").click(); }, () => Object.keys(G.grids).length === 7]);
+      S.push(["2-1. + 기둥: 교점 12곳 클릭", () => { setMode("column"); for (let i = 0; i < 12; i++) { const c = q('[data-kind="cand-pt"]'); if (!c) break; click(c, center(c)); } }, () => G.nodes.filter(n => n.type === "column").length === 12]);
+      S.push(["2-2. + 보: 기둥 사이 17구간 클릭", () => { setMode("beam"); for (let i = 0; i < 17; i++) { const c = q('[data-kind="cand-seg"]'); if (!c) break; click(c, center(c)); } }, () => G.edges.filter(e => e.beam).length === 17]);
+      S.push(["2-3. + 벽: 바깥 둘레 10구간 클릭", () => { setMode("wall"); const xs = ["X1", "X2", "X3", "X4"], ys = ["Y1", "Y2", "Y3"]; for (let i = 0; i < 3; i++) { segAt([xs[i], "Y1"], [xs[i + 1], "Y1"]); segAt([xs[i], "Y3"], [xs[i + 1], "Y3"]); } for (let j = 0; j < 2; j++) { segAt(["X1", ys[j]], ["X1", ys[j + 1]]); segAt(["X4", ys[j]], ["X4", ys[j + 1]]); } }, () => G.edges.filter(e => e.wall).length === 10]);
+      S.push(["3-1. + 문(두 짝 1800): 아래 벽 X2~X3 가운데. + 창호(1900): 위 벽 세 구간과 왼쪽 벽 두 구간, 놓은 뒤 오른쪽에서 타입 선택", () => { const dt = G.otypes.find(t => t.kind === "door" && t.leaves === 2) || G.otypes.find(t => t.kind === "door"), wt = G.otypes.filter(t => t.kind === "window" && !t.band && !t.check && t.width >= 1800).sort((a, b) => a.width - b.width)[0] || G.otypes.find(t => t.kind === "window");
+        openOn("door", wallAt(["X2", "Y1"], ["X3", "Y1"]), 0.5); set("inOT", dt.id);
+        [[["X1", "Y3"], ["X2", "Y3"]], [["X2", "Y3"], ["X3", "Y3"]], [["X3", "Y3"], ["X4", "Y3"]], [["X1", "Y1"], ["X1", "Y2"]], [["X1", "Y2"], ["X1", "Y3"]]].forEach((s2, i) => { openOn("window", wallAt(s2[0], s2[1]), i === 4 ? 0.62 : 0.5); set("inOT", wt.id); }); render(); }, () => G.openings.filter(o => o.type === "window").length === 5 && G.openings.every(o => o.type !== "window" || o.width >= 1800) && G.openings.some(o => o.type === "door" && o.leaves === 2)]);
+      S.push(["3-2. + 코어: 승강기 EV1을 X1-Y2에, 입구 오른쪽, 왼쪽 벽 끄기", () => { setMode("core"); $("selCore").value = "EV1"; const c = q('[data-kind="cand-core"][data-xi="X1"][data-yj="Y2"]'); click(c, center(c)); set("inCE", "E"); const b = document.querySelector('.inCW[data-side="W"]'); if (b && b.checked) { b.checked = false; b.dispatchEvent(new Event("change")); } }, () => G.cores.some(c => c.kind === "elevator" && c.rect.entry === "E")]);
+      S.push(["3-3. + 코어: 계단 ST1을 X2-Y2에, 옆으로 뒤집기", () => { setMode("core"); $("selCore").value = "ST1"; const c = q('[data-kind="cand-core"][data-xi="X2"][data-yj="Y2"]'); click(c, center(c)); $("btnCS").click(); }, () => G.cores.some(c => c.kind === "stair" && c.side === -1)]);
+      S.push(["4-1. 위·아래 외벽 두께 300, 옆 외벽 250", () => { sel = null; render(); set("inWT", 250); $("btnWTAll").click(); ["Y1", "Y3"].forEach(gy => { const e = G.edges.find(x => x.wall && x.along === gy); sel = { kind: "edge", id: e.id }; render(); set("inThick", 300); $("btnThickLine").click(); }); sel = null; render(); }, () => G.edges.filter(e => e.wall && e.thick === 300).length === 6 && G.edges.filter(e => e.wall && e.thick === 250).length === 4]);
+      S.push(["4-2. + 사선: X3-Y1과 X4-Y2를 이어 모서리 자르기 (모서리 기둥·벽·보 삭제)", () => { setMode("select"); const c = nodeAtG("X4", "Y1"); [["X3", "Y1"], ["X4", "Y2"]].forEach(o => { const e = G.edges.find(x => (x.from === c.id && x.to === nodeAtG(o[0], o[1]).id) || (x.to === c.id && x.from === nodeAtG(o[0], o[1]).id)); if (e) { sel = { kind: "edge", id: e.id }; render(); $("btnDel").click(); } }); if (nodeAtG("X4", "Y1")) { pick("column", nodeAtG("X4", "Y1").id); $("btnDel").click(); }
+        setMode("diag"); let a = q('[data-kind="cand-diag"][data-xi="X3"][data-yj="Y1"]'); click(a, center(a)); const b = q('[data-kind="cand-diag"][data-xi="X4"][data-yj="Y2"]'); click(b, center(b)); const ck = $("ckBeam"); if (ck && !ck.checked) { ck.checked = true; ck.dispatchEvent(new Event("change")); } }, () => G.edges.some(e => e.diag && e.wall && e.beam)]);
+      S.push(["5. 검토자 이름을 쓰고 변경 내보내기", () => { $("reviewer").value = "리허설"; sel = null; render(); }, () => exportChanges(ORIG, G, "리허설").length >= 40]);
+    }
+    return S;
+  }
+  function rehearsalExpected() {
+    // 도면에 반영한 뒤 다시 읽어 대조할 요약 (한계 찾기 시험과 같은 형식)
+    const dd = diff(ORIG, G), lab = n => n.grid.join("-"), blank = ORIG.source === "blank";
+    const ex = {
+      columns: G.nodes.filter(n => n.type === "column").map(n => ({ label: lab(n), xy: n.cxy || n.xy, spec: n.spec })),
+      columns_deleted: blank ? [] : dd.cols_deleted.map(c => ({ label: c.grid.join("-"), xy: c.xy })),
+      walls_checked: [...dd.walls_added.map(e => ({ label: e.id, from_xy: e.from_xy, to_xy: e.to_xy, thick: blank ? e.thick : undefined, expect: true })),
+        ...(blank ? [] : dd.walls_deleted.map(e => ({ label: e.id, from_xy: e.from_xy, to_xy: e.to_xy, expect: false })))],
+      openings_checked: [...dd.openings_added.map(o => ({ id: o.id, type: o.type, xy: o.center, width: o.width, expect: true })),
+        ...(blank ? [] : dd.openings.filter(o => o.edited).map(o => ({ id: o.id, type: o.type, xy: o.to_xy, width: o.to_w, expect: true }))),
+        ...(blank ? [] : dd.openings_deleted.map(o => { const p = ORIG.openings.find(x => x.id === o.id); return { id: o.id, type: o.type, xy: p.xy, width: p.width, expect: false }; }))],
+      dims_checked: blank ? [] : dd.dims.map(x => ({ handle: x.handle, to: x.to })),
+      mep: { devices: (G.mep ? G.mep.devices : []).filter(d => !d.orphan).map(x => ({ id: x.id, type: x.type, xy: x.xy })), checked: [], routes: [] },
+    };
+    if (blank) Object.assign(ex, { site: G.site, floor_height: G.project.floor_height,
+      cores: G.cores.map(c => ({ id: c.id, type: c.type, anchor: c.anchor, anchor_xy: [G.grids[c.anchor[0]].coord, G.grids[c.anchor[1]].coord], dir: c.dir, side: c.side, entry: c.rect.entry, travel: c.kind === "stair" ? (c.travel || "UP") : null, walls: c.rect.flags, wall_thick: c.rect.T, rect: [c.rect.x0, c.rect.y0, c.rect.x1, c.rect.y1] })),
+      auto_dims: [...G.dims.map(d => ({ orient: d.orient, value: d.measurement })), ...G.dims2.map(d => ({ orient: d.orient, value: d.value }))] });
+    return ex;
+  }
+  function runRehearsal(upto) {
+    const S = rehearsalSteps(), log = [];
+    let done = 0;
+    for (const [name, act, check] of S.slice(0, upto)) {
+      try { act(); render(); const ok = check(); log.push(`${ok ? "OK  " : "FAIL"} ${name}`); if (!ok) break; done++; }
+      catch (e) { log.push(`ERR  ${name}: ${e.message}`); break; }
+    }
+    const cap = document.createElement("div"); cap.id = "rehearsalCap";
+    cap.style.cssText = "position:fixed;left:16px;bottom:56px;max-width:60%;background:#1a237e;color:#fff;padding:10px 14px;font-size:15px;border-radius:6px;z-index:99;white-space:pre-wrap";
+    cap.textContent = (S[done - 1] ? S[done - 1][0] : "시작") + (done < Math.min(upto, S.length) ? "\n" + log[log.length - 1] : "");
+    document.body.appendChild(cap);
+    const out = document.createElement("textarea"); out.id = "rehearsalOut"; out.style.display = "none";
+    out.textContent = JSON.stringify({ steps: S.length, done, log, warnings: warnings(ORIG, G), changes: exportChanges(ORIG, G, "리허설"), expected: rehearsalExpected() });      // DOM 덤프에 남도록 textContent 로
+    document.body.appendChild(out);
+  }
+  { const m = location.hash.match(/rehearsal(?:=(\d+))?/); if (m) runRehearsal(m[1] ? Number(m[1]) : 99); }
 })();
 </script>
 </body>
