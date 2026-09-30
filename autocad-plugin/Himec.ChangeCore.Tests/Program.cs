@@ -272,4 +272,50 @@ var emptyPlan = PdfExportPlanner.Build([], "plan.dxf");
 if (emptyPlan.Schedule.Count != 0 || emptyPlan.Annotations.Count != 0 || emptyPlan.MatchedCount != 0)
     throw new Exception("Empty change list produced content");
 
-Console.WriteLine("Parser, targeting, legacy recording tags, realtime tag contract, change matching, and pdf plan checks passed");
+// --- instruction file: the relation editor's "지시 불러오기" reads these fields as is ---
+plan.Schedule[0].Grid = "X1-Y2";
+var instr = InstructionExport.Build(plan, @"C:\out\plan-변경일람-20260930-190327.pdf",
+    new DateTimeOffset(2026, 9, 30, 19, 3, 27, TimeSpan.FromHours(9)));
+if (instr.SourcePdf != "plan-변경일람-20260930-190327.pdf" || instr.Drawing != "plan.dxf")
+    throw new Exception("The file must name the PDF and drawing without their folders");
+if (instr.Items.Count != 2 || instr.Notes.Count != 1 || !instr.Notes[0].StartsWith("[2] "))
+    throw new Exception("Every schedule row and question must reach the instruction file");
+var first = instr.Items[0];
+if (first.No != 1 || first.Target != "C1 #A1" || first.Tag != "C1" || first.Handle != "A1" || first.Grid != "X1-Y2")
+    throw new Exception("A settled row must carry its tag, handle and grid separately");
+if (first.Status != "confirmed" || first.Action != "move" || first.Axis != "Y" || first.Delta != 300 || first.Change != "Y +300 mm")
+    throw new Exception("A settled single-axis move must be ready for the editor");
+var second = instr.Items[1];
+if (second.Status != "needs_review" || second.Handle is not null || second.Question is null)
+    throw new Exception("An unsettled row must stay for review with its question");
+if (instr.Items.Any(i => i.ChangeId.Length == 0))
+    throw new Exception("Each item must keep the change it came from");
+
+var diagonal = new PdfExportPlan { Drawing = @"C:\d\pdf-test.dxf.dwg" };
+diagonal.Schedule.Add(new PdfScheduleRow
+{
+    ChangeId = "d1", Marker = "1", Target = "C1", Handle = "8e", Action = "move", DxMm = 300, DyMm = -200,
+    Change = "X +300 mm / Y -200 mm", State = PdfExportPlanner.StateConfirmedTarget,
+});
+var split = InstructionExport.Build(diagonal, "x.pdf", DateTimeOffset.Now).Items;
+if (split.Count != 2 || split[0].Axis != "X" || split[0].Delta != 300 || split[0].Change != "X +300 mm" ||
+    split[1].Axis != "Y" || split[1].Delta != -200 || split[1].Change != "Y -200 mm" ||
+    split.Any(i => i.No != 1 || i.ChangeId != "d1" || i.Handle != "8E" || i.Target != "C1 #8E" || i.Dx != 300 || i.Dy != -200))
+    throw new Exception("A diagonal move must become one item per axis under the same number");
+
+var json = InstructionExport.Serialize(instr);
+if (!json.Contains("\"status_text\": \"대상 확정\"") || json.Contains("\\u"))
+    throw new Exception("Hangul must stay readable in the instruction file");
+using (var parsed = JsonDocument.Parse(json))
+{
+    var item = parsed.RootElement.GetProperty("items")[0];
+    if (parsed.RootElement.GetProperty("schema").GetString() != InstructionFile.SchemaName ||
+        item.GetProperty("delta").GetDouble() != 300 || item.GetProperty("axis").GetString() != "Y")
+        throw new Exception("Instruction file JSON is missing editor fields");
+}
+if (json.Contains(planInput[0].SourceQuote))
+    throw new Exception("Meeting talk must not be written into the instruction file");
+if (InstructionExport.PathFor(@"C:\out\a-변경일람-1.pdf") != @"C:\out\a-변경일람-1.json")
+    throw new Exception("The instruction file must sit next to the PDF under the same name");
+
+Console.WriteLine("Parser, targeting, legacy recording tags, realtime tag contract, change matching, pdf plan, and instruction file checks passed");

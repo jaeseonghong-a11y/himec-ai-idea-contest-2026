@@ -18,6 +18,7 @@ public sealed class PdfAnnotation
 /// <summary>One line of the schedule printed at the right of the sheet.</summary>
 public sealed class PdfScheduleRow
 {
+    public string ChangeId { get; set; } = "";
     public string Marker { get; set; } = "";
     public string Target { get; set; } = "";
     public string Floor { get; set; } = "";
@@ -31,6 +32,11 @@ public sealed class PdfScheduleRow
     public string State { get; set; } = "";
     public string Note { get; set; } = "";
     public string Quote { get; set; } = "";
+
+    /// <summary>The move as numbers, so the instruction file does not have to re-read <see cref="Change"/>.</summary>
+    public string Action { get; set; } = "";
+    public double DxMm { get; set; }
+    public double DyMm { get; set; }
 }
 
 public sealed class PdfExportPlan
@@ -96,6 +102,10 @@ public static class PdfExportPlanner
                     Change = move,
                     Floor = floor,
                     State = StateConfirmedTarget,
+                    ChangeId = change.Id,
+                    Action = change.Action,
+                    DxMm = change.DxMm,
+                    DyMm = change.DyMm,
                     Note = $"handle {handle}",
                     Quote = change.SourceQuote,
                 });
@@ -109,6 +119,10 @@ public static class PdfExportPlanner
                 Change = move,
                 Floor = floor,
                 State = StateQuestion,
+                ChangeId = change.Id,
+                Action = change.Action,
+                DxMm = change.DxMm,
+                DyMm = change.DyMm,
                 Note = change.Question ?? "",
                 Quote = change.SourceQuote,
             });
