@@ -2,7 +2,9 @@
 
 ## 현재 상태 (2026-09-30, 팀장 AI)
 
-- 2026-09-30 브랜치 정리: 병합 완료 작업 브랜치 31개와 더 이상 사용하지 않는 Round 01 브랜치 2개를 원격에서 삭제했다. PR #14의 미병합 내용은 `archive/archuni-r01-20260930` 태그에 보존했다. 현재 원격은 `main`, 열린 PR #34의 `work/archuni/r02`, 열린 PR #50의 `work/archuni/r03`, 작업 커밋이 없는 `work/ehgudwns18/r02`뿐이다. 김기준의 PR #52 병합 후 `r02`는 삭제했고 다음 브랜치는 아직 배정하지 않았다. `BRANCH_ASSIGNMENTS.md`와 시작 프롬프트를 갱신했다.
+- 2026-09-30 김기준 팀원에게 #17 합성 도면·대본·사이드카 작업을 `work/kijun-0108/r03`으로 재배정했다. 이전 PR #52의 관계도 프로토타입과 분리하고 `prototype/samples/`, `prototype/sidecar/`만 담당한다. 새 브랜치는 배정 문서를 병합한 최신 `main`에서 생성한다. 다른 팀원의 열린 PR #34·#50과 `ehgudwns18/r02`는 그대로 유지한다. Recommended Next Step: 김기준 AI가 `prompts/TEAM_NEXT_ROUND.md`를 읽고 #17의 합성 DXF 1장·사이드카 1개를 먼저 공유한 뒤 남은 산출물을 완성해 PR을 연다.
+
+- 2026-09-30 브랜치 정리 당시: 병합 완료 작업 브랜치 31개와 더 이상 사용하지 않는 Round 01 브랜치 2개를 원격에서 삭제했다. PR #14의 미병합 내용은 `archive/archuni-r01-20260930` 태그에 보존했다. 정리 직후 원격에는 `main`, 열린 PR #34의 `work/archuni/r02`, 열린 PR #50의 `work/archuni/r03`, 작업 커밋이 없는 `work/ehgudwns18/r02`만 남았고, 이후 김기준의 `r03`을 새로 배정했다. `BRANCH_ASSIGNMENTS.md`와 시작 프롬프트를 갱신했다.
 
 - 2026-09-30 김기준 팀원 [PR #52](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/52)를 원본 SHA `ba434aa` 검토 후 squash 병합(`8dde212`)했다. `prototype/relation-editor/` 독립 관계도 편집기·DXF 생성/재읽기·마스킹 도면 4장·시나리오 이미지를 기존 기능과 함께 보존했다. 팀원 주장과 팀장 승인에 따른 실제 도면 공개 예외는 `prototype/CONTRACT.md` 참조. 원본 동의·저작권은 독립 검증 전이다. 검증: 도면 4장 문자열 마스킹 검사, 새 프로젝트 로직 75/75·기존 도면 44/44, 합성 계획안 2종의 DXF 재읽기 33/33, Edge 새 프로젝트 화면 29/29. 기존 플러그인과 런타임 연결은 하지 않았고, 김기준 PC의 AutoCAD 2024 결과는 이 PC에서 재검증하지 않았다. #17의 합성 A-101/A-301/E-201·대본·사이드카 계약은 별도 미완료다.
 - 사용자 PC의 AutoCAD 종료 후 v0.5.1-lab 번들을 설치했고 매니페스트 `0.5.1.0`과 DLL SHA-256 `F40C372A70BFB21B81A967050AA56E61C4927E3DC142AB7850556AB3ED291F59`를 확인했다. 이전 번들은 ApplicationPlugins의 `.himec-backups`에 보존했다. 사용자 Gemini 503이 이 버전에서 해결됐는지는 AutoCAD 재시작 후 같은 시험 WAV로 확인해야 한다.
