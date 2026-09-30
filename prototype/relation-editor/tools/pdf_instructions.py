@@ -7,7 +7,8 @@ PDF에는 표(번호 / 대상 / 변경 / 층 / 상태)가 실제 글자로 들�
 - 변경은 "X +300 mm", "Y -200 mm" 꼴의 이동만 처리한다. 기둥과 함께 기둥에 닿아 있던 선의 끝점도 같이 옮긴다(띠 STRETCH).
 - 원본은 건드리지 않고 out/real/<이름>_pdf_edited.dxf 로 쓴다.
 
-사용: python tools/pdf_instructions.py <지시 PDF> <대상 DXF>
+사용: python tools/pdf_instructions.py <지시 PDF>              # 편집기용 JSON(out/real/instructions_*.json)으로 변환
+      python tools/pdf_instructions.py <지시 PDF> <대상 DXF>   # 관계도 없이 도면 객체를 직접 옮김
 """
 import json
 import re
@@ -129,9 +130,25 @@ def apply(pdf_path, dxf_path):
     return report
 
 
+def export_json(pdf_path):
+    """편집기의 '지시 불러오기'가 읽는 JSON. 도면 없이 PDF만으로 만든다."""
+    items, notes = read_table(pdf_path)
+    out = ROOT / "out" / "real" / f"instructions_{Path(pdf_path).stem}.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps({"source_pdf": Path(pdf_path).name, "items": items, "notes": notes}, ensure_ascii=False, indent=1), encoding="utf-8")
+    return out, items
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 2:
         sys.exit(__doc__)
+    if len(sys.argv) == 2:                      # PDF만 주면 편집기용 JSON으로 변환
+        out, items = export_json(sys.argv[1])
+        print(f"지시 {len(items)}건 → {out}")
+        for it in items:
+            print(f'  [{it["no"]}] {it["target"]} {it["change"]} {it["floor"]} / {it["status_text"]} ({it["status"]})')
+        print("편집기에서 [지시 불러오기]로 이 파일을 열면 됩니다.")
+        sys.exit(0)
     rep = apply(sys.argv[1], sys.argv[2])
     print(f'지시 {len(rep["items"])}건 (PDF: {Path(rep["pdf"]).name} → DXF: {Path(rep["dxf"]).name})')
     for it in rep["items"]:

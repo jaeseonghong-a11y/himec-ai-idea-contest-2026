@@ -184,6 +184,24 @@ G = fresh(); C.newProjectDemo(G);
   const id = C.addCore(G3, "ST3", gid3("x", 15000), gid3("y", 9500), "E", 1), c = G3.cores.find(x => x.id === id);
   ok("직선 계단을 놓으면 화살표가 한 줄이고 가운데 나눔선이 없음", c.rect.calc.form === "straight" && c.rect.arrows.length === 1 && c.rect.arrows[0].pts.length === 2 && c.rect.x1 - c.rect.x0 === c.rect.calc.length, JSON.stringify(c.rect.arrows[0])); }
 
+// 변경 지시(PDF 표)를 관계도에 적용
+G = fresh(); C.newProjectDemo(G);
+{ const items = [
+    { no: 1, target: "C1", change: "Y +300 mm", floor: "", status_text: "대상 확정", status: "confirmed", action: "move", axis: "Y", delta: 300 },
+    { no: 2, target: "기둥", change: "Y -200 mm", floor: "3층?", status_text: "확인 필요", status: "needs_review", action: "move", axis: "Y", delta: -200 },
+    { no: 3, target: "X2-Y3", change: "X +500 mm", floor: "", status_text: "대상 확정", status: "confirmed", action: "move", axis: "X", delta: 500 },
+    { no: 4, target: "Y1", change: "Y -100 mm", floor: "", status_text: "대상 확정", status: "confirmed", action: "move", axis: "Y", delta: -100 }];
+  const x2 = G.grids.X2.coord, y1 = G.grids.Y1.coord;
+  const r = C.loadInstructions(G, items);
+  ok("지시 [1] C1: 타입 기둥이 12개라 자동 적용하지 않고 사람에게 남김", !r[0].applied && r[0].ask && r[0].note.includes("12개"), r[0].note);
+  ok("지시 [2] 확인 필요: 적용하지 않음", !r[1].applied && r[1].note.includes("확정이 아님"));
+  ok("지시 [3] X2-Y3 기둥 X +500: 그 기둥이 놓인 세로 그리드 X2가 +500", r[2].applied && G.grids.X2.coord === x2 + 500 && r[2].note.includes("X2"), r[2].note);
+  ok("지시 [4] 그리드 Y1 -100: 그대로 적용", r[3].applied && G.grids.Y1.coord === y1 - 100);
+  const a = C.applyInstruction(G, items[0], { node: G.nodes.find(n => n.grid[0] === "X3" && n.grid[1] === "Y2") });
+  ok("사람이 대상(X3-Y2 기둥)을 찍어 주면 [1]이 적용됨: Y2 그리드 +300", a.ok && G.grids.Y2.coord === 9500 + 300, a.note);
+  const b = C.applyInstruction(G, items[0], { grid: "X1" });
+  ok("Y 이동에 세로 그리드를 찍으면 거부", !b.ok && b.ask); }
+
 // 긴 층고: 3 m 마다 계단참
 { const k = C.stairCalc(7000, 1200);
   ok("층고 7000이면 한 번에 오르는 높이가 3 m를 넘어 중간 계단참이 생김", !!k.mid_landing && k.mid_landing.depth === 1200 && k.length === k.run + 1200 + 1200 && k.riser <= 180, JSON.stringify(k.mid_landing));

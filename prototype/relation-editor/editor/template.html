@@ -80,6 +80,7 @@
   <button id="btnReset">처음으로</button>
   <button id="btnFit">화면 맞춤</button>
   <button id="btnExport" class="primary">변경 내보내기 (changes.json)</button>
+  <button id="btnInstr" title="플러그인이 낸 변경 지시 PDF를 tools/pdf_instructions.py 로 변환한 JSON">지시 불러오기</button><input type="file" id="fileInstr" accept=".json" style="display:none">
 </header>
 <div id="legend">(설비·전기·소방은 가상 타입, 코어 치수는 가정값) ○ 기둥 · ─ 벽 · - - 보 · □ 창호 · △ 문 · 녹색 치수 · <span class="hot">빨강 = 변경</span> · <span class="new">초록 = 새로 추가</span> · 삭제한 것은 흐린 빨강 점선</div>
 <main>
@@ -88,6 +89,7 @@
     <h2>선택한 요소</h2><div id="selPanel" class="empty">도면에서 요소를 선택하세요.</div>
     <h2>기둥 타입 일람표</h2><div id="typePanel"></div>
     <h2>문·창호 타입 일람표</h2><div id="otypePanel"></div>
+    <h2>변경 지시 <span class="muted" style="font-weight:normal">(회의 → PDF 표)</span></h2><div id="instrPanel"><div class="empty">불러온 지시 없음</div></div>
     <h2>경고</h2><div id="warnPanel"></div>
     <h2>변경 내역 (원본 대비)</h2><div id="changePanel"></div>
     <h2>내보내기</h2>
@@ -795,6 +797,36 @@ function addDiagonal(g, a, b, kind) {
   if (!a || !b || a.xi === b.xi || a.yj === b.yj) return null;
   return addEdge(g, { a, b, along: null }, kind);
 }
+// ----- 변경 지시(회의 녹음 → 플러그인 → PDF 표)를 관계도에 적용 -----
+function resolveInstruction(g, it) {
+  // 지시의 대상(태그)을 관계도 요소로 푼다. 돌려주는 값: {grid} 또는 {node} 또는 {ask: 이유}
+  const tag = (it.target || "").trim(), m = tag.match(/^([XY]\d+)-([XY]\d+)$/i) || tag.match(/^([XY]\d+)$/i);
+  if (m && !m[2] && g.grids[m[1].toUpperCase()]) return { grid: m[1].toUpperCase() };
+  if (m && m[2]) { const n = g.nodes.find(n => (n.grid[0] === m[1].toUpperCase() && n.grid[1] === m[2].toUpperCase()) || (n.grid[1] === m[1].toUpperCase() && n.grid[0] === m[2].toUpperCase())); if (n) return { node: n }; }
+  const byType = g.nodes.filter(n => n.type === "column" && n.ctype === tag);
+  if (byType.length === 1) return { node: byType[0] };
+  if (byType.length > 1) return { ask: `${tag} 타입 기둥이 ${byType.length}개라 하나로 정할 수 없음` };
+  return { ask: `"${tag}"에 해당하는 요소가 없음` };
+}
+function applyInstruction(g, it, target) {
+  // 이동 지시를 적용한다. 기둥은 그리드에 붙어 있으므로, 기둥 이동은 그 축의 그리드를 옮기는 것으로 해석한다(같은 줄의 기둥이 함께 움직임)
+  if (it.action !== "move" || !it.axis || !Number.isFinite(it.delta)) return { ok: false, note: `처리할 수 없는 변경 "${it.change}"` };
+  const t = target || resolveInstruction(g, it);
+  if (t.ask) return { ok: false, note: t.ask, ask: true };
+  const axis = it.axis.toLowerCase();
+  let gid = t.grid;
+  if (t.node) gid = axis === "x" ? t.node.grid[0] : t.node.grid[1];
+  if (!gid || g.grids[gid].axis !== axis) return { ok: false, note: `${it.axis} 방향 이동인데 대상이 ${gid || "없음"}(${gid && g.grids[gid] ? (g.grids[gid].axis === "x" ? "세로" : "가로") + " 그리드" : ""})`, ask: true };
+  const from = g.grids[gid].coord; moveGridTo(g, gid, from + it.delta);
+  const got = g.grids[gid].coord - from;
+  return { ok: got === it.delta, note: `${gid} 그리드 ${from} → ${g.grids[gid].coord} (${it.delta > 0 ? "+" : ""}${it.delta})` + (got !== it.delta ? ` — 이웃 그리드 때문에 ${got}만 이동` : "") + (t.node ? `, 기둥 ${t.node.grid.join("-")}이 놓인 줄` : ""), grid: gid };
+}
+function loadInstructions(g, items) {
+  // 확정이고 대상이 하나로 정해지는 지시는 바로 적용, 나머지는 사람이 대상을 찍어 적용하도록 남긴다
+  return items.map(it => { const r = { ...it, applied: false, note: "" };
+    if (it.status !== "confirmed") { r.note = "확정이 아님. 검토 뒤 대상을 찍어 적용할 수 있음"; return r; }
+    const a = applyInstruction(g, it); r.applied = a.ok; r.note = a.note; r.ask = !!a.ask; return r; });
+}
 function deleteEdgeKind(g, id, kind) {
   const e = g.edges.find(x => x.id === id);
   if (!e || !e[kind]) return false;
@@ -1094,7 +1126,7 @@ function demoScenario(g) {
   }
   return log;
 }
-if (typeof module !== "undefined") module.exports = { wallsOnFaces, outsideDiagonal, addDiagonal, newProjectShowcase, LW_DEFAULT, wallLw, beamLw, beamMembers, clampThick, coreWallThick, setWallThick, thickEditable, anchorOffset, siteSpan, dimObstacles, layoutDims, DIM_FIT, entryChoices, stairLead, coreEntry, coreWallFlags, coreDetail, detailDims, scheduleTables, CORE_TYPES, stairCalc, coreRect, addCore, deleteCore, setSite, addGridFree, addGridSeries, autoDims, projectInfo, polyArea, newProjectDemo, addDevice, deleteDevice, mepDiff, mepWarnings, addOpeningType, initModel, recompute, moveGridTo, addGrid, deleteGrid, intersections, candidateSegments, nodeAt, findEdge, addColumn, deleteColumn, addEdge, deleteEdgeKind, addOpening, deleteOpening, diff, warnings, exportChanges, gridLimits, demoScenario, clone, idx };
+if (typeof module !== "undefined") module.exports = { resolveInstruction, applyInstruction, loadInstructions, wallsOnFaces, outsideDiagonal, addDiagonal, newProjectShowcase, LW_DEFAULT, wallLw, beamLw, beamMembers, clampThick, coreWallThick, setWallThick, thickEditable, anchorOffset, siteSpan, dimObstacles, layoutDims, DIM_FIT, entryChoices, stairLead, coreEntry, coreWallFlags, coreDetail, detailDims, scheduleTables, CORE_TYPES, stairCalc, coreRect, addCore, deleteCore, setSite, addGridFree, addGridSeries, autoDims, projectInfo, polyArea, newProjectDemo, addDevice, deleteDevice, mepDiff, mepWarnings, addOpeningType, initModel, recompute, moveGridTo, addGrid, deleteGrid, intersections, candidateSegments, nodeAt, findEdge, addColumn, deleteColumn, addEdge, deleteEdgeKind, addOpening, deleteOpening, diff, warnings, exportChanges, gridLimits, demoScenario, clone, idx };
 </script>
 
 <script id="ui">
@@ -1102,7 +1134,7 @@ if (typeof module !== "undefined") module.exports = { wallsOnFaces, outsideDiago
 (function () {
   if (typeof document === "undefined" || !ORIG_GRAPH) return;
   const ORIG = recompute(initModel(ORIG_GRAPH));
-  let G = clone(ORIG), undo = [], sel = null, vb = null, mode = "select", diagFirst = null;
+  let G = clone(ORIG), undo = [], sel = null, vb = null, mode = "select", diagFirst = null, instr = [];
   const svg = document.getElementById("svg"), $ = id => document.getElementById(id);
   $("title").textContent = `관계도 편집기 — ${ORIG.sheet}` + (ORIG.source === "pdf" ? " (PDF에서 읽음)" : "");
   const RED = "#d62728", NEW = "#0a8f3c", SEL = "#1f6feb";
@@ -1439,6 +1471,12 @@ if (typeof module !== "undefined") module.exports = { wallsOnFaces, outsideDiago
     $("btnAddOT").onclick = () => commit(() => { const k = $("otKind").value; addOpeningType(G, k === "window" ? "window" : "door", Number($("otW").value) || 900, k === "door2" ? 2 : 1); });
     // 경고
     const W = warnings(ORIG, G);
+    $("instrPanel").innerHTML = instr.length ? `<ul class="warn" style="list-style:none;padding-left:0">${instr.map((it, i) => `<li style="margin-bottom:6px"><b>[${it.no}]</b> ${esc(it.target)} ${esc(it.change)} ${it.floor ? esc(it.floor) + " " : ""}<span class="${it.status === "confirmed" ? "new" : "hot"}">${esc(it.status_text || it.status)}</span><br>
+      ${it.applied ? `<span class="new">적용됨</span> ${esc(it.note)}` : `${esc(it.note)} ${it.action === "move" ? `<button class="instrApply" data-i="${i}" title="화면에서 그리드나 기둥을 고른 뒤 누르면 그 대상에 적용">고른 대상에 적용</button>` : ""}`}</li>`).join("")}</ul>` : `<div class="empty">불러온 지시 없음</div>`;
+    document.querySelectorAll(".instrApply").forEach(b => { b.onclick = () => { const it = instr[Number(b.dataset.i)];
+      if (!sel || (sel.kind !== "grid" && sel.kind !== "column")) { alert("먼저 화면에서 옮길 그리드나 기둥을 클릭하세요."); return; }
+      const tgt = sel.kind === "grid" ? { grid: sel.id } : { node: idx(G.nodes)[sel.id] };
+      const r = commit(() => applyInstruction(G, it, tgt)); it.applied = r.ok; it.note = r.note; if (!r.ok) alert(r.note); render(); }; });
     $("warnPanel").innerHTML = W.length ? `<ul class="warn">${W.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<div class="empty">없음</div>`;
     // 변경 내역
     const L = [], ON = idx(ORIG.nodes), lb = id => { const n = N[id] || ON[id]; return n ? label(n) : id; }, seg = e => `${lb(e.id.split("~")[0])}~${lb(e.id.split("~")[1])}`;
@@ -1512,6 +1550,10 @@ if (typeof module !== "undefined") module.exports = { wallsOnFaces, outsideDiago
   $("btnUndo").onclick = () => { if (!undo.length) return; G = JSON.parse(undo.pop()); $("btnUndo").disabled = !undo.length; render(); };
   $("btnReset").onclick = () => { if (JSON.stringify(G) === JSON.stringify(ORIG)) return; undo.push(JSON.stringify(G)); G = clone(ORIG); $("btnUndo").disabled = false; sel = null; render(); };
   $("btnFit").onclick = fit;
+  $("btnInstr").onclick = () => $("fileInstr").click();
+  $("fileInstr").onchange = ev => { const f = ev.target.files[0]; if (!f) return; const rd = new FileReader();
+    rd.onload = () => { try { const j = JSON.parse(rd.result), items = Array.isArray(j) ? j : (j.items || []); commit(() => { instr = loadInstructions(G, items); }); render(); } catch (e) { alert("지시 파일을 읽지 못했습니다: " + e.message); } };
+    rd.readAsText(f, "utf-8"); ev.target.value = ""; };
   $("btnExport").onclick = () => { const out = exportChanges(ORIG, G, $("reviewer").value.trim()); if (!out.length) { alert("변경 사항이 없습니다."); return; }
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: "application/json" })); a.download = `changes_${G.sheet}.json`; a.click(); URL.revokeObjectURL(a.href); };
   // 시연용: 주소 끝에 #demo 를 붙이면 예시 편집을 적용한 상태로, #mode=wall 처럼 붙이면 그 도구 모드로 시작
@@ -1695,6 +1737,13 @@ if (typeof module !== "undefined") module.exports = { wallsOnFaces, outsideDiago
         sel = { kind: "grid", id: last.id }; render(); const tgt = $("selMerge").value; $("btnMerge").click();
         ok("이웃 그리드로 합치기: 그 그리드가 사라지고 요소는 이웃으로 옮겨짐", !G.grids[last.id] && !!G.grids[tgt] && G.nodes.every(n => n.grid[0] !== last.id) && G.edges.every(e => e.from !== e.to) && sel && sel.id === tgt);
         $("btnUndo").click(); ok("되돌리기", !!G.grids[last.id]); sel = null; render(); }
+      { const items = [{ no: 1, target: "C1", change: "Y +300 mm", status_text: "대상 확정", status: "confirmed", action: "move", axis: "Y", delta: 300 }, { no: 2, target: "기둥", change: "Y -200 mm", floor: "3층?", status_text: "확인 필요", status: "needs_review", action: "move", axis: "Y", delta: -200 }];
+        commit(() => { instr = loadInstructions(G, items); }); render();
+        ok("지시 불러오기: 목록이 패널에 뜨고, 자동으로 못 정한 것은 '고른 대상에 적용' 단추가 있음", $("instrPanel").querySelectorAll("li").length === 2 && $("instrPanel").querySelectorAll(".instrApply").length === 2);
+        const gy = Object.values(G.grids).filter(x => x.axis === "y").sort((a, b) => a.coord - b.coord), g1 = gy[gy.length - 1], c0 = g1.coord;
+        sel = { kind: "grid", id: g1.id }; render(); $("instrPanel").querySelector(".instrApply").click();
+        ok("그리드를 고르고 '고른 대상에 적용'을 누르면 그 그리드가 +300", G.grids[g1.id].coord === c0 + 300 && instr[0].applied && $("instrPanel").textContent.includes("적용됨"), instr[0].note);
+        $("btnUndo").click(); ok("되돌리기", G.grids[g1.id].coord === c0); instr = []; sel = null; render(); }
       ok("변경 내보내기 내용이 만들어짐", ["set_site", "add_grid", "add_column", "add_wall", "add_beam", "add_opening", "add_core", "add_dims"].every(a => ex.some(c => c.action === a)), `(${ex.length}건)`);
     } catch (err) { out.push("FAIL  시험 중 오류: " + (err && err.stack ? err.stack.split("\n").slice(0, 3).join(" | ") : err)); }
     const pass = out.filter(x => x.startsWith("PASS")).length;
