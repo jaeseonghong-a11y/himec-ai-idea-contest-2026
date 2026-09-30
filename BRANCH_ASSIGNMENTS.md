@@ -1,6 +1,6 @@
 # 현재 브랜치 배정
 
-2026-09-30 기준: 팀원 작업 브랜치는 아래 4개다. 원칙은 팀원당 진행 브랜치 하나이지만, `archuni`의 서로 다른 과제 PR #34·#50이 둘 다 열려 있어 일시적으로 2개를 보존한다. 김기준 팀원의 PR #52는 병합됐고 이전 `r02` 브랜치는 삭제했다. 다음 작업은 최신 `main`에서 새로 만든 `work/kijun-0108/r03`의 #17이다.
+2026-09-30 기준: 김기준 팀원의 `r03` 작업은 [PR #57](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/57)로 보완·병합됐다. 원본 [PR #56](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/56)은 같은 내용을 포함한 통합 PR의 중복이므로 닫았다. #17 합성 입력 산출물은 아직 없으므로 다음 `work/kijun-0108/r04`에서 계속한다. `archuni`의 서로 다른 과제 PR #34·#50은 그대로 열려 있다.
 
 ## AutoCAD 2024 호환 작업 — archuni 별도 과제 (2026-09-29)
 
@@ -16,7 +16,7 @@
 
 | 담당 | 지정 브랜치 | 새 이슈 | 담당 파일 |
 |---|---|---|---|
-| `kijun-0108` | `work/kijun-0108/r03` (PR #52 병합 후 새 브랜치) | [#17 합성 도면·대본·사이드카](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/17)는 PR #52의 관계도 프로토타입과 별개 | `prototype/samples/`, `prototype/sidecar/`의 합성 산출물만 담당. `prototype/relation-editor/`는 이번 작업에서 변경하지 않음 |
+| `kijun-0108` | `work/kijun-0108/r04` (이 문서 병합 후 최신 `main`에서 생성) | [#17 합성 도면·대본·사이드카](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/17)는 PR #57의 관계도 기능과 별개 | `prototype/samples/`, `prototype/sidecar/`의 합성 산출물만 담당. `prototype/relation-editor/`는 이번 작업에서 변경하지 않음 |
 | `archuni` | `work/archuni/r02` — [PR #34 열림](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/34) | [#18 변경지시 추출·PDF 주석·승인](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/18) | `prototype/extract/`, `prototype/annotate/` |
 | `ehgudwns18` | `work/ehgudwns18/r02` — 원격 존재, 아직 작업 커밋 없음 | [#20 경량 관계 그래프](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/20) | `prototype/graph/` |
 | `jaeseonghong-a11y` | 팀장 전용 작업 브랜치 | [#19 합성 DXF 전파·검사](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/19), [#25 AutoCAD 플러그인 v0](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/25) | `prototype/propagate/`, `autocad-plugin/`, 통합·제출 문서 |
@@ -27,7 +27,7 @@ Round 01 조사 결과 중 병합된 것은 `main`과 PR 기록에 남아 있다
 
 ## 옛 브랜치 정리 기록
 
-2026-09-30 병합 완료 PR의 브랜치 31개, 내용이 `main`에 이미 있는 `ehgudwns18/r01`, 태그로 보존한 `archuni/r01`을 삭제했다. 브랜치 삭제는 병합된 `main` 커밋·PR 기록·Release·보존 태그를 삭제하지 않는다. 열린 PR #34·#50의 브랜치와 현재 배정된 `ehgudwns18/r02`는 유지한다. PR 병합 후에는 팀장이 해당 브랜치를 삭제하고, 다음 이슈를 정했을 때만 새 브랜치를 만든다. 김기준의 다음 `r03`은 이 원칙에 따라 별도 생성했다.
+2026-09-30 병합 완료 PR의 브랜치 31개, 내용이 `main`에 이미 있는 `ehgudwns18/r01`, 태그로 보존한 `archuni/r01`을 삭제했다. 브랜치 삭제는 병합된 `main` 커밋·PR 기록·Release·보존 태그를 삭제하지 않는다. 열린 PR #34·#50의 브랜치와 현재 배정된 `ehgudwns18/r02`는 유지한다. 김기준 `r03`은 PR #57에 통합돼 종료됐고 원격 이력은 보존한다. `r04`는 #17 작업을 위해 최신 `main`에서 새로 만든다.
 
 ## 상태 규칙
 
