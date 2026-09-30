@@ -15,6 +15,7 @@ public sealed class PdfScheduleRow
 {
     public string Marker { get; set; } = "";
     public string Target { get; set; } = "";
+    public string Floor { get; set; } = "";
     public string Change { get; set; } = "";
     public string State { get; set; } = "";
     public string Note { get; set; } = "";
@@ -56,6 +57,11 @@ public static class PdfExportPlanner
             number++;
             var marker = number.ToString();
             var target = change.Labels.Count > 0 ? string.Join(", ", change.Labels) : "미지정";
+            // The floor gets its own short column: appending it to the target wrapped the
+            // cell onto a second line and pushed the rows below it out of place.
+            var floor = change.IsMatched || string.IsNullOrEmpty(change.ContextFloor)
+                ? ""
+                : change.ContextFloor + "?";
             var move = ChangeMatching.Describe(change);
             if (change.IsMatched)
             {
@@ -73,6 +79,7 @@ public static class PdfExportPlanner
                     Marker = marker,
                     Target = target,
                     Change = move,
+                    Floor = floor,
                     State = StateConfirmedTarget,
                     Note = $"handle {change.Handle}",
                     Quote = change.SourceQuote,
@@ -85,6 +92,7 @@ public static class PdfExportPlanner
                 Marker = marker,
                 Target = target,
                 Change = move,
+                Floor = floor,
                 State = StateQuestion,
                 Note = change.Question ?? "",
                 Quote = change.SourceQuote,
@@ -93,10 +101,19 @@ public static class PdfExportPlanner
         return plan;
     }
 
-    /// <summary>Column headers for the schedule, left to right.</summary>
-    public static IReadOnlyList<string> Headers => ["번호", "대상", "변경", "상태", "비고"];
+    /// <summary>Column headers for the schedule, left to right.
+    ///
+    /// The note is deliberately not a column: a question runs long enough to
+    /// overrun a cell, so it is printed as a list under the table instead.
+    /// </summary>
+    public static IReadOnlyList<string> Headers => ["번호", "대상", "변경", "층", "상태"];
 
     /// <summary>The cells of one row, matching <see cref="Headers"/>.</summary>
     public static IReadOnlyList<string> Cells(PdfScheduleRow row) =>
-        [row.Marker, row.Target, row.Change, row.State, row.Note];
+        [row.Marker, row.Target, row.Change, row.Floor, row.State];
+
+    /// <summary>The questions printed under the table, one line each.</summary>
+    public static IReadOnlyList<string> Questions(PdfExportPlan plan) =>
+        plan.Schedule.Where(r => r.State == StateQuestion && r.Note.Length > 0)
+            .Select(r => $"[{r.Marker}] {r.Note}").ToArray();
 }

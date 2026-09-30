@@ -109,6 +109,24 @@ public sealed class PluginCommands : IExtensionApplication
         _panel?.SetStatus(reason);
     }
 
+    [CommandMethod("HIMEC_PDF_CLEAR")]
+    public void ClearPdfMarkup()
+    {
+        var doc = AcadApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        try
+        {
+            var erased = PdfExporter.ClearMarkup(doc);
+            doc.Editor.WriteMessage($"\nHIMEC: 주석·일람표 객체 {erased}개를 지웠습니다.\n");
+            _panel?.SetStatus($"주석·일람표 {erased}개를 지웠습니다. 도면은 저장하지 않았습니다.");
+        }
+        catch (System.Exception ex)
+        {
+            doc.Editor.WriteMessage($"\nHIMEC: 표식 지우기 실패: {ex.Message}\n");
+            _panel?.SetStatus("표식 지우기 실패: " + ex.Message);
+        }
+    }
+
     [CommandMethod("HIMEC_PDF")]
     public void ExportPdf()
     {
@@ -128,9 +146,15 @@ public sealed class PluginCommands : IExtensionApplication
             Directory.CreateDirectory(folder);
             var stem = Path.GetFileNameWithoutExtension(doc.Name);
             var path = Path.Combine(folder, $"{stem}-변경일람-{DateTime.Now:yyyyMMdd-HHmmss}.pdf");
-            PdfExporter.Export(doc, plan, path);
+            PdfExporter.Export(doc, plan, path, _panel.KeepMarkup);
             doc.Editor.WriteMessage($"\nHIMEC: PDF를 저장했습니다. {path}\n");
-            _panel.SetStatus($"PDF 저장 완료 — 확정 {plan.MatchedCount}건, 확인 필요 {plan.QuestionCount}건. 도면은 수정하지 않았습니다.");
+            var kept = _panel.KeepMarkup
+                ? "주석·일람표를 도면에 남겼습니다(저장 안 함). 지우려면 표식 지우기."
+                : "도면은 그대로 두었습니다.";
+            var layers = PdfExporter.LastDeviceUsed.StartsWith("HIMEC", StringComparison.Ordinal)
+                ? "레이어 포함"
+                : "레이어 미포함(기본 드라이버)";
+            _panel.SetStatus($"PDF 저장 완료 — 확정 {plan.MatchedCount}건, 확인 필요 {plan.QuestionCount}건. {layers}. {kept}");
         }
         catch (System.Exception ex)
         {

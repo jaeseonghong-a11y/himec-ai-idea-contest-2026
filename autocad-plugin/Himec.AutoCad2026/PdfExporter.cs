@@ -15,10 +15,25 @@ namespace Himec.AutoCad2026;
 /// </summary>
 internal static class PdfExporter
 {
+    internal const string TextStyleName = "HIMEC-TEXT";
     internal const string AnnotationLayer = "HIMEC-주석";
     internal const string ScheduleLayer = "HIMEC-일람표";
 
-    internal static string Export(Document doc, PdfExportPlan plan, string outputPath)
+    /// <summary>Plotter configurations to try, best first.
+    ///
+    /// "Include layer information" lives in the PDF driver's own options and cannot be
+    /// set through the .NET API, so a PC3 saved with it enabled is preferred when the
+    /// user has made one. With it, the markup layers can be switched off in the PDF
+    /// viewer. Falling back to the stock driver still produces a PDF, just without layers.
+    /// </summary>
+    private static readonly string[] Devices = ["HIMEC PDF (layers).pc3", "DWG To PDF.pc3"];
+
+    /// <summary>The plot configuration used by the last export.</summary>
+    internal static string LastDeviceUsed { get; private set; } = "";
+
+    private static ObjectId _textStyle = ObjectId.Null;
+
+    internal static string Export(Document doc, PdfExportPlan plan, string outputPath, bool keepMarkup)
     {
         if (doc is null) throw new ArgumentNullException(nameof(doc));
         if (plan is null) throw new ArgumentNullException(nameof(plan));
@@ -31,6 +46,7 @@ internal static class PdfExporter
         {
             using (var tr = db.TransactionManager.StartTransaction())
             {
+                _textStyle = EnsureTextStyle(tr, db);
                 EnsureLayer(tr, db, AnnotationLayer, 1);
                 EnsureLayer(tr, db, ScheduleLayer, 4);
                 var space = (BlockTableRecord)tr.GetObject(db.CurrentSpaceId, OpenMode.ForWrite);
@@ -38,9 +54,10 @@ internal static class PdfExporter
                 db.UpdateExt(true);
                 var min = db.Extmin;
                 var max = db.Extmax;
-                var height = Math.Max(max.Y - min.Y, 1.0);
-                // Keep the markup readable whatever the sheet size is.
-                var textHeight = Math.Max(height / 70.0, 1.0);
+                // Sized from the longer side: a wide, short drawing made the markup
+                // unreadable when this was based on height alone.
+                var span = Math.Max(Math.Max(max.X - min.X, max.Y - min.Y), 1.0);
+                var textHeight = Math.Max(span / 60.0, 1.0);
 
                 foreach (var annotation in plan.Annotations)
                 {
@@ -48,7 +65,7 @@ internal static class PdfExporter
                     if (anchor is null) continue;
                     created.AddRange(DrawCallout(tr, space, anchor.Value, annotation, textHeight));
                 }
-                created.AddRange(DrawSchedule(tr, space, plan, max, textHeight));
+                created.AddRange(DrawSchedule(tr, space, plan, min, max, textHeight));
                 tr.Commit();
             }
 
@@ -57,8 +74,33 @@ internal static class PdfExporter
         }
         finally
         {
-            Remove(db, created);
+            // Kept on request so the reviewer can see the callouts in the drawing.
+            // HIMEC_PDF_CLEAR removes them again; the drawing is never saved here.
+            if (!keepMarkup) Remove(db, created);
         }
+    }
+
+    /// <summary>A TrueType style for the markup.
+    ///
+    /// The drawing's default style is usually an SHX font, which AutoCAD can only stroke
+    /// for Latin text and has to substitute for Hangul. That mixes hairline Latin with
+    /// solid Hangul on the same line, and leaves the Latin unsearchable in the PDF.
+    /// One TrueType face covering both scripts keeps the weight even.
+    /// </summary>
+    private static ObjectId EnsureTextStyle(Transaction tr, Database db)
+    {
+        var table = (TextStyleTable)tr.GetObject(db.TextStyleTableId, OpenMode.ForRead);
+        if (table.Has(TextStyleName)) return table[TextStyleName];
+        table.UpgradeOpen();
+        var style = new TextStyleTableRecord
+        {
+            Name = TextStyleName,
+            FileName = "malgun.ttf",
+            Font = new Autodesk.AutoCAD.GraphicsInterface.FontDescriptor("Malgun Gothic", false, false, 0, 0),
+        };
+        var id = table.Add(style);
+        tr.AddNewlyCreatedDBObject(style, true);
+        return id;
     }
 
     private static void EnsureLayer(Transaction tr, Database db, string name, short colorIndex)
@@ -95,88 +137,126 @@ internal static class PdfExporter
     {
         var ids = new List<ObjectId>();
         var tip = new Point3d(anchor.X, anchor.Y + textHeight * 3, 0);
+        var radius = textHeight * 0.9;
+        // Stop at the bubble edge rather than running through it to the centre.
+        var stop = tip - (tip - anchor).GetNormal() * radius;
 
-        ids.Add(Add(tr, space, new Line(anchor, tip) { Layer = AnnotationLayer }));
-        ids.Add(Add(tr, space, new Circle(tip, Vector3d.ZAxis, textHeight * 0.9) { Layer = AnnotationLayer }));
+        ids.Add(Add(tr, space, new Line(anchor, stop) { Layer = AnnotationLayer }));
+        ids.Add(Add(tr, space, new Circle(tip, Vector3d.ZAxis, radius) { Layer = AnnotationLayer }));
         ids.Add(Add(tr, space, new MText
         {
-            Contents = annotation.Marker,
+            Contents = Escape(annotation.Marker),
             Location = tip,
             TextHeight = textHeight,
             Attachment = AttachmentPoint.MiddleCenter,
+            TextStyleId = _textStyle,
             Layer = AnnotationLayer,
         }));
         ids.Add(Add(tr, space, new MText
         {
-            Contents = annotation.Text,
+            Contents = Escape(annotation.Text),
             Location = new Point3d(tip.X + textHeight * 1.4, tip.Y, 0),
             TextHeight = textHeight,
             Attachment = AttachmentPoint.MiddleLeft,
+            TextStyleId = _textStyle,
             Layer = AnnotationLayer,
         }));
         return ids;
     }
 
     private static List<ObjectId> DrawSchedule(Transaction tr, BlockTableRecord space,
-        PdfExportPlan plan, Point3d max, double textHeight)
+        PdfExportPlan plan, Point3d min, Point3d max, double textHeight)
     {
         var ids = new List<ObjectId>();
-        var rowHeight = textHeight * 2.2;
-        var left = max.X + textHeight * 6;
-        var top = max.Y;
-        var width = textHeight * 46;
-        var columns = new[] { 0.0, textHeight * 4, textHeight * 12, textHeight * 22, textHeight * 30 };
+        var rowHeight = textHeight * 2.0;
+        var left = max.X + textHeight * 8;
+        var width = textHeight * 40;
+        var columns = new[] { 0.0, textHeight * 3.5, textHeight * 11, textHeight * 21, textHeight * 27 };
+        var questions = PdfExportPlanner.Questions(plan);
 
-        ids.Add(Add(tr, space, new MText
-        {
-            Contents = plan.Title + "  —  " + plan.Drawing,
-            Location = new Point3d(left, top + rowHeight, 0),
-            TextHeight = textHeight * 1.3,
-            Attachment = AttachmentPoint.TopLeft,
-            Layer = ScheduleLayer,
-        }));
+        var titleHeight = rowHeight * 1.5;
+        var tableHeight = (plan.Schedule.Count + 1) * rowHeight;
+        // Wrapped text needs room proportional to its length: a fixed block let the
+        // longest question run over the footer.
+        var questionHeight = questions.Sum(q => BlockHeight(q, width, textHeight)) + rowHeight * 0.4;
+        var footerHeight = rowHeight * 1.6;
 
-        var y = top;
-        WriteRow(tr, space, ids, PdfExportPlanner.Headers, left, y, columns, textHeight, width);
+        // Bottom-aligned with the drawing so the block reads as a lower-right schedule.
+        var bottom = min.Y;
+        var top = bottom + titleHeight + tableHeight + questionHeight + footerHeight;
+
+        var sheet = string.IsNullOrWhiteSpace(plan.Drawing) ? "" : Path.GetFileName(plan.Drawing);
+        ids.Add(Add(tr, space, Text(plan.Title + "  —  " + sheet,
+            left, top, textHeight * 1.3, width)));
+
+        // Each row owns a band of rowHeight; cells are centred inside their own band.
+        var tableTop = top - titleHeight;
+        var band = tableTop;
+        WriteRow(tr, space, ids, PdfExportPlanner.Headers, left, band, columns, textHeight, width, rowHeight);
         foreach (var row in plan.Schedule)
         {
-            y -= rowHeight;
-            WriteRow(tr, space, ids, PdfExportPlanner.Cells(row), left, y, columns, textHeight, width);
+            band -= rowHeight;
+            WriteRow(tr, space, ids, PdfExportPlanner.Cells(row), left, band, columns, textHeight, width, rowHeight);
         }
 
-        var bottom = top - (plan.Schedule.Count + 1) * rowHeight;
-        ids.Add(Add(tr, space, Box(left, bottom, left + width, top + rowHeight * 0.4)));
+        var tableBottom = tableTop - tableHeight;
+        ids.Add(Add(tr, space, Box(left, tableBottom, left + width, tableTop)));
+        var headerLine = tableTop - rowHeight;
         ids.Add(Add(tr, space, new Line(
-            new Point3d(left, top - rowHeight * 0.6, 0),
-            new Point3d(left + width, top - rowHeight * 0.6, 0)) { Layer = ScheduleLayer }));
-        ids.Add(Add(tr, space, new MText
+            new Point3d(left, headerLine, 0),
+            new Point3d(left + width, headerLine, 0)) { Layer = ScheduleLayer }));
+
+        // A question is a sentence, not a cell value: printing it full width under the
+        // table keeps it from running over the neighbouring columns.
+        var y = tableBottom - rowHeight * 0.9;
+        foreach (var question in questions)
         {
-            Contents = plan.Footer,
-            Location = new Point3d(left, bottom - rowHeight * 0.6, 0),
-            TextHeight = textHeight * 0.9,
-            Attachment = AttachmentPoint.TopLeft,
-            Width = width,
-            Layer = ScheduleLayer,
-        }));
+            ids.Add(Add(tr, space, Text(question, left, y, textHeight * 0.85, width)));
+            y -= BlockHeight(question, width, textHeight);
+        }
+        ids.Add(Add(tr, space, Text(plan.Footer, left, y - rowHeight * 0.5, textHeight * 0.85, width)));
         return ids;
     }
 
     private static void WriteRow(Transaction tr, BlockTableRecord space, List<ObjectId> ids,
-        IReadOnlyList<string> cells, double left, double y, double[] columns, double textHeight, double width)
+        IReadOnlyList<string> cells, double left, double bandTop, double[] columns,
+        double textHeight, double width, double rowHeight)
     {
+        var middle = bandTop - rowHeight / 2;
         for (var i = 0; i < cells.Count && i < columns.Length; i++)
         {
             var next = i + 1 < columns.Length ? columns[i + 1] : width;
             ids.Add(Add(tr, space, new MText
             {
-                Contents = cells[i] ?? "",
-                Location = new Point3d(left + columns[i] + textHeight * 0.4, y, 0),
+                Contents = Escape(cells[i]),
+                Location = new Point3d(left + columns[i] + textHeight * 0.4, middle, 0),
                 TextHeight = textHeight * 0.9,
-                Attachment = AttachmentPoint.TopLeft,
+                Attachment = AttachmentPoint.MiddleLeft,
                 Width = Math.Max(next - columns[i] - textHeight * 0.8, textHeight * 2),
+                TextStyleId = _textStyle,
                 Layer = ScheduleLayer,
             }));
         }
+    }
+
+    private static MText Text(string? contents, double x, double y, double height, double width) => new()
+    {
+        Contents = Escape(contents),
+        Location = new Point3d(x, y, 0),
+        TextHeight = height,
+        Attachment = AttachmentPoint.TopLeft,
+        Width = width,
+        TextStyleId = _textStyle,
+        Layer = ScheduleLayer,
+    };
+
+    /// <summary>Rough height of wrapped text. Estimated from character count because the
+    /// real extent is only known after the MText is added to the database.</summary>
+    private static double BlockHeight(string text, double width, double textHeight)
+    {
+        var perLine = Math.Max(1, (int)(width / (textHeight * 0.75)));
+        var lines = Math.Max(1, (int)Math.Ceiling((text ?? "").Length / (double)perLine));
+        return lines * textHeight * 1.5;
     }
 
     private static Polyline Box(double x1, double y1, double x2, double y2)
@@ -188,6 +268,11 @@ internal static class PdfExporter
         box.AddVertexAt(3, new Point2d(x1, y2), 0, 0, 0);
         return box;
     }
+
+    /// <summary>MText reads a backslash as a format code, so a Windows path or a
+    /// brace in the transcript would silently disappear from the sheet.</summary>
+    private static string Escape(string? text) => (text ?? "")
+        .Replace("\\", "\\\\").Replace("{", "\\{").Replace("}", "\\}");
 
     private static ObjectId Add(Transaction tr, BlockTableRecord space, Entity entity)
     {
@@ -208,6 +293,26 @@ internal static class PdfExporter
         tr.Commit();
     }
 
+    /// <summary>Erase every entity this exporter left on its two layers.</summary>
+    internal static int ClearMarkup(Document doc)
+    {
+        var db = doc.Database;
+        var erased = 0;
+        using var locked = doc.LockDocument();
+        using var tr = db.TransactionManager.StartTransaction();
+        var space = (BlockTableRecord)tr.GetObject(db.CurrentSpaceId, OpenMode.ForRead);
+        foreach (var id in space)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not Entity entity) continue;
+            if (entity.Layer != AnnotationLayer && entity.Layer != ScheduleLayer) continue;
+            entity.UpgradeOpen();
+            entity.Erase();
+            erased++;
+        }
+        tr.Commit();
+        return erased;
+    }
+
     private static void PlotToPdf(Document doc, string outputPath)
     {
         var db = doc.Database;
@@ -218,7 +323,23 @@ internal static class PdfExporter
         settings.CopyFrom(layout);
 
         var validator = PlotSettingsValidator.Current;
-        validator.SetPlotConfigurationName(settings, "DWG To PDF.pc3", null);
+        var chosen = "";
+        foreach (var device in Devices)
+        {
+            try
+            {
+                validator.SetPlotConfigurationName(settings, device, null);
+                chosen = device;
+                break;
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception)
+            {
+                // Not installed on this machine; try the next one.
+            }
+        }
+        if (chosen.Length == 0)
+            throw new InvalidOperationException("PDF 플로터를 찾지 못했습니다. DWG To PDF.pc3 설치를 확인하세요.");
+        LastDeviceUsed = chosen;
         validator.RefreshLists(settings);
         validator.SetPlotType(settings, Autodesk.AutoCAD.DatabaseServices.PlotType.Extents);
         validator.SetUseStandardScale(settings, true);

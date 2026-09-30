@@ -180,6 +180,32 @@ if (ChangeMatching.Extract("오늘 회의는 여기까지.", matchSession, "plan
 if (ChangeMatching.Describe(several[0]) != "Y +300 mm")
     throw new Exception("Move description is wrong: " + ChangeMatching.Describe(several[0]));
 
+// --- transcript context: the floor in force carries forward ---
+if (TranscriptContext.FloorIn("지하 2층 평면도 보자") != "지하 2층")
+    throw new Exception("Basement floor was misread");
+if (TranscriptContext.FloorIn("3층으로 넘어가죠") != "3층")
+    throw new Exception("Floor was not read");
+if (TranscriptContext.FloorIn("기둥을 옮기자") is not null)
+    throw new Exception("A sentence with no floor reported one");
+var tracked = TranscriptContext.Track(["2층 보자", "기둥 확인", "3층으로 가죠", "여기 보 확인"]);
+if (tracked[0] != "2층" || tracked[1] != "2층" || tracked[2] != "3층" || tracked[3] != "3층")
+    throw new Exception("Floor did not carry forward: " + string.Join("/", tracked));
+
+var floorChanges = ChangeMatching.Extract(
+    "2층 도면 보자. 3층으로 넘어가죠. 기둥을 아래로 200mm 내리자.", matchSession, "plan.dxf");
+if (floorChanges.Count != 1 || floorChanges[0].ContextFloor != "3층")
+    throw new Exception("Change did not inherit the floor from earlier talk");
+if (floorChanges[0].IsMatched)
+    throw new Exception("Floor context must not settle a target on its own");
+if (floorChanges[0].Question is null || !floorChanges[0].Question!.Contains("3층"))
+    throw new Exception("The question should carry the assumed floor");
+var floorPlan = PdfExportPlanner.Build(floorChanges, "plan.dxf");
+if (floorPlan.Schedule[0].Floor != "3층?" || floorPlan.Schedule[0].Target.Contains("층"))
+    throw new Exception("Floor belongs in its own column, not appended to the target");
+var settled = ChangeMatching.Extract("3층 보자. C1을 위로 30cm 올리자.", matchSession, "plan.dxf");
+if (!settled[0].IsMatched || PdfExportPlanner.Build(settled, "plan.dxf").Schedule[0].Floor.Length != 0)
+    throw new Exception("A settled change must not be labelled as an assumption");
+
 // --- pdf export plan: callouts on matched objects, schedule for everything ---
 var planInput = ChangeMatching.Extract(
     "C1을 위로 30cm 올리자. 기둥을 아래로 200mm 내리자. 오늘은 여기까지.",
@@ -203,6 +229,12 @@ if (PdfExportPlanner.Cells(plan.Schedule[0]).Count != PdfExportPlanner.Headers.C
     throw new Exception("Schedule row does not match the header count");
 if (!plan.Footer.Contains("도면은 수정되지 않았습니다"))
     throw new Exception("Footer must state that the drawing was not edited");
+var questions = PdfExportPlanner.Questions(plan);
+if (questions.Count != 1 || !questions[0].StartsWith("[2] "))
+    throw new Exception("Questions must list only unresolved rows, numbered");
+if (PdfExportPlanner.Headers.Contains("비고"))
+    throw new Exception("The note is a list under the table, not a column");
+
 var emptyPlan = PdfExportPlanner.Build([], "plan.dxf");
 if (emptyPlan.Schedule.Count != 0 || emptyPlan.Annotations.Count != 0 || emptyPlan.MatchedCount != 0)
     throw new Exception("Empty change list produced content");

@@ -32,6 +32,9 @@ public sealed class MatchedChange
     public string State { get; set; } = ChangeMatchState.QuestionNeeded;
     public string? QuestionKind { get; set; }
     public string? Question { get; set; }
+
+    /// <summary>Floor read from the surrounding talk. An assumption, never a confirmed target.</summary>
+    public string? ContextFloor { get; set; }
     public List<string> CandidateTagIds { get; set; } = [];
 
     public bool IsMatched => State == ChangeMatchState.Matched;
@@ -52,8 +55,11 @@ public static class ChangeMatching
         var results = new List<MatchedChange>();
         if (string.IsNullOrWhiteSpace(transcript)) return results;
 
-        foreach (var sentence in ObjectMentions.Sentences(transcript))
+        var sentences = ObjectMentions.Sentences(transcript).ToArray();
+        var floors = TranscriptContext.Track(sentences);
+        for (var index = 0; index < sentences.Length; index++)
         {
+            var sentence = sentences[index];
             var moves = InstructionParser.ParseAllMoves(sentence);
             if (moves.Count == 0) continue;
 
@@ -67,6 +73,7 @@ public static class ChangeMatching
                     DxMm = move.DxMm,
                     DyMm = move.DyMm,
                     Labels = labels.ToList(),
+                    ContextFloor = floors[index],
                 };
                 if (moves.Count > 1)
                 {
@@ -151,7 +158,9 @@ public static class ChangeMatching
     {
         item.State = ChangeMatchState.QuestionNeeded;
         item.QuestionKind = kind;
-        item.Question = question;
+        item.Question = string.IsNullOrEmpty(item.ContextFloor)
+            ? question
+            : $"{question} (앞 대화 기준 {item.ContextFloor}으로 보입니다 — 확인 필요)";
         item.TagId = null;
         item.Drawing = null;
         item.Handle = null;

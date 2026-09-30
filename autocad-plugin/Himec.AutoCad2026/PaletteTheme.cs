@@ -31,6 +31,16 @@ internal static class PaletteTheme
         button.Cursor = Cursors.Hand;
     }
 
+    public static void Check(CheckBox box)
+    {
+        box.Height = 26;
+        box.ForeColor = Text;
+        box.BackColor = Surface;
+        box.Font = new Font("Segoe UI", 9F);
+        box.Margin = new Padding(0, 3, 0, 3);
+        box.Cursor = Cursors.Hand;
+    }
+
     public static void Label(Label label)
     {
         label.ForeColor = Muted;

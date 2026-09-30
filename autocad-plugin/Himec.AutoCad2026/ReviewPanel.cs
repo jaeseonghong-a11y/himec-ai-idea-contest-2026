@@ -24,9 +24,9 @@ internal sealed class ReviewPanel : UserControl
     private readonly Button _analyze = new() { Text = "전사문에서 이동 지시 찾기", Width = 340 };
     private readonly Button _suggest = new() { Text = "'왼쪽 세 번째' 후보 찾기", Width = 340 };
     private readonly Button _pick = new() { Text = "도면에서 대상 직접 선택", Width = 340 };
-    private readonly Button _approve = new() { Text = "지시 승인", Width = 340 };
-    private readonly Button _execute = new() { Text = "승인된 변경 실행", Width = 340 };
     private readonly Button _exportPdf = new() { Text = "수정사항 PDF로 내보내기", Width = 340 };
+    private readonly Button _clearMarkup = new() { Text = "도면에서 주석·일람표 지우기", Width = 340 };
+    private readonly CheckBox _keepMarkup = new() { Text = "표식을 도면에 남기기 (저장은 하지 않음)", Checked = true, Width = 340 };
     private readonly RecordingTagPanel _tagReview = new();
     private string? _sessionApiKey;
     private string? _selectedAudioPath;
@@ -75,9 +75,8 @@ internal sealed class ReviewPanel : UserControl
         var cardTags = CreateCard("02  녹음 객체 태그", "녹음 중 직접 찍기 · 전사 후 언급 검토/수정", _tagReview);
         var cardParse = CreateCard("03  변경 지시 확인", "이동량을 읽고, 불명확한 대상은 보류합니다.", _analyze, _summary);
         var cardTarget = CreateCard("04  도면 대상 지정", "후보는 참고용 · 최종 대상은 직접 클릭", _suggest, _pick, _target);
-        var cardApply = CreateCard("05  검토 후 반영", "승인 전에는 도면을 수정하지 않습니다.", _approve, _execute);
-        var cardExport = CreateCard("06  PDF 내보내기", "일람표는 도면 우측, 주석은 해당 요소 위. 도면은 그대로 둡니다.", _exportPdf);
-        var cards = new[] { cardInput, cardTags, cardParse, cardTarget, cardApply, cardExport };
+        var cardExport = CreateCard("05  PDF 내보내기", "일람표는 도면 우측 하단, 주석은 해당 요소 위. 표식은 도면에 남고 저장은 하지 않습니다.", _keepMarkup, _exportPdf, _clearMarkup);
+        var cards = new[] { cardInput, cardTags, cardParse, cardTarget, cardExport };
         foreach (var card in cards) layout.Controls.Add(card);
         layout.SizeChanged += (_, _) =>
         {
@@ -97,8 +96,9 @@ internal sealed class ReviewPanel : UserControl
         shell.Controls.Add(layout, 0, 2);
         Controls.Add(shell);
 
-        foreach (var button in new[] { _record, _stop, _chooseAudio, _setApiKey, _transcribe, _analyze, _suggest, _pick, _approve, _execute, _exportPdf })
-            PaletteTheme.Button(button, primary: button == _analyze || button == _pick, caution: button == _execute);
+        PaletteTheme.Check(_keepMarkup);
+        foreach (var button in new[] { _record, _stop, _chooseAudio, _setApiKey, _transcribe, _analyze, _suggest, _pick, _exportPdf, _clearMarkup })
+            PaletteTheme.Button(button, primary: button == _analyze || button == _pick);
         foreach (var label in new[] { _keyState, _recordingInfo, _summary, _target }) PaletteTheme.Label(label);
         _summary.ForeColor = PaletteTheme.Text;
         _target.ForeColor = PaletteTheme.Text;
@@ -118,12 +118,14 @@ internal sealed class ReviewPanel : UserControl
         _suggest.Click += (_, _) => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_SUGGEST ", true, false, false);
         _pick.Click += (_, _) => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_PICK ", true, false, false);
         _exportPdf.Click += (_, _) => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_PDF ", true, false, false);
-        _approve.Click += (_, _) => Approve();
-        _execute.Click += (_, _) => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_APPLY ", true, false, false);
+        _clearMarkup.Click += (_, _) => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_PDF_CLEAR ", true, false, false);
         _tagReview.StatusChanged += SetStatus;
         _tagReview.ScanRequested += () => { _tagReview.AddTranscriptMentions(_transcript.Text); };
         _tagReview.PickRequested += () => AcadApp.DocumentManager.MdiActiveDocument?.SendStringToExecute("HIMEC_TAG_PICK ", true, false, false);
     }
+
+    /// <summary>Whether the callouts and schedule stay in the drawing after plotting.</summary>
+    internal bool KeepMarkup => _keepMarkup.Checked;
 
     /// <summary>Match the transcript against the tagged objects and lay out the PDF content.
     /// Returns null with a reason when there is nothing to export yet.</summary>
@@ -364,39 +366,6 @@ internal sealed class ReviewPanel : UserControl
         _summary.Text = $"제안: 블록 이동 X {change!.DxMm:+0.##;-0.##;0} mm / Y {change.DyMm:+0.##;-0.##;0} mm\nWCS 좌표 기준 · 자동 대상 확정 안 함 · 로컬 규칙 해석";
         _target.Text = "대상 미지정 — 도면에서 직접 선택하세요.";
         SetStatus(reason);
-    }
-
-    private void Approve()
-    {
-        var change = PluginCommands.CurrentInstruction;
-        var doc = AcadApp.DocumentManager.MdiActiveDocument;
-        if (change is null || doc is null || change.TargetHandle is null || change.TargetDrawing != doc.Name)
-        {
-            SetStatus("승인 불가: 도면에서 대상 블록을 먼저 지정하세요.");
-            return;
-        }
-        if (_transcript.Text.Trim() != change.SourceText)
-        {
-            SetStatus("전사문이 바뀌었습니다. 다시 지시 찾기를 눌러 분석하세요.");
-            return;
-        }
-        var message = $"현재 도면: {doc.Name}\n대상: {change.TargetHandle}\n이동: X {change.DxMm} mm, Y {change.DyMm} mm\n\n이 지시를 승인할까요?";
-        if (MessageBox.Show(message, "변경 지시 검토", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-        try
-        {
-            change.Status = "confirmed";
-            change.Reviewer = Environment.UserName;
-            change.ReviewedAt = DateTimeOffset.Now;
-            LocalRecordStore.Save(change);
-            SetStatus("승인 기록 완료. 실행 버튼을 눌러야 도면이 바뀝니다.");
-        }
-        catch (System.Exception ex)
-        {
-            change.Status = "needs_review";
-            change.Reviewer = null;
-            change.ReviewedAt = null;
-            SetStatus("승인 기록 실패, 실행 불가: " + ex.Message);
-        }
     }
 
     protected override void Dispose(bool disposing)

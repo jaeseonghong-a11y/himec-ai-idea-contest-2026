@@ -27,6 +27,7 @@
         <Command Global="HIMEC_SUGGEST" Local="HIMEC_SUGGEST" />
         <Command Global="HIMEC_APPLY" Local="HIMEC_APPLY" />
         <Command Global="HIMEC_PDF" Local="HIMEC_PDF" />
+        <Command Global="HIMEC_PDF_CLEAR" Local="HIMEC_PDF_CLEAR" />
       </Commands>
     </ComponentEntry>
   </Components>
