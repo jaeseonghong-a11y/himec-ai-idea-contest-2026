@@ -1932,6 +1932,20 @@ if (typeof module !== "undefined") module.exports = { offsetToGrid, offsetColumn
     document.body.appendChild(out);
   }
   { const m = location.hash.match(/rehearsal(?:=(\d+))?/); if (m) runRehearsal(m[1] ? Number(m[1]) : 99); }
+  // 시연 영상 녹화(tools/record_demo.py)가 쓰는 갈고리: 화면 좌표와 상태를 읽기만 하고 바꾸지 않는다. 조작은 실제 마우스·키보드 이벤트로 한다
+  window.__vid = {
+    toClient: (x, y) => { const q = new DOMPoint(x, -y).matrixTransform(svg.getScreenCTM()); return [q.x, q.y]; },
+    segIndex: (a, b) => candidateSegments(G).findIndex(sg => (sg.a.xi === a[0] && sg.a.yj === a[1] && sg.b.xi === b[0] && sg.b.yj === b[1]) || (sg.a.xi === b[0] && sg.a.yj === b[1] && sg.b.xi === a[0] && sg.b.yj === a[1])),
+    node: (x, y) => { const n = G.nodes.find(n => n.grid[0] === x && n.grid[1] === y); return n ? { id: n.id, xy: n.xy, type: n.type } : null; },
+    wallEdge: (a, b) => { const N = idx(G.nodes); const e = G.edges.find(e => (N[e.from].grid.join() === a.join() && N[e.to].grid.join() === b.join()) || (N[e.from].grid.join() === b.join() && N[e.to].grid.join() === a.join())); return e ? { id: e.id, from: N[e.from].xy, to: N[e.to].xy, wall: !!e.wall } : null; },
+    outletWall: () => { const e = G.edges.find(x => x.wall && x.along === "Y1" && !x.diag && G.mep && G.mep.devices.some(d => d.host && d.host.kind === "wall" && d.host.edge === x.id)); if (!e) return null; const d = G.mep.devices.find(d => d.host && d.host.kind === "wall" && d.host.edge === e.id); const N = idx(G.nodes); return { id: e.id, x: d.a, y: N[e.from].xy[1] }; },
+    grids: () => Object.fromEntries(Object.values(G.grids).map(g => [g.id, g.coord])),
+    otypes: () => G.otypes.map(t => ({ id: t.id, kind: t.kind, width: t.width, leaves: t.leaves || 1, band: !!t.band, check: !!t.check })),
+    opening: id => { const o = G.openings.find(o => o.id === id); return o ? { id: o.id, otype: o.otype, width: o.width, type: o.type } : null; },
+    lastOpening: () => { const o = G.openings[G.openings.length - 1]; return o ? { id: o.id, otype: o.otype, width: o.width, type: o.type } : null; },
+    expected: () => rehearsalExpected(),
+    state: () => ({ cols: G.nodes.filter(n => n.type === "column").length, beams: G.edges.filter(e => e.beam).length, walls: G.edges.filter(e => e.wall).length, openings: G.openings.length, cores: G.cores.length, instr: instr.map(i => ({ applied: i.applied, note: i.note })), warnings: warnings(ORIG, G).length }),
+  };
 })();
 </script>
 </body>
