@@ -254,13 +254,16 @@ def plan_dims(items, obs, grid_layer="CEN", ignore=(), h=250, gap=80, step=300, 
 
     돌려주는 값: 항목마다 {"q": 치수선 위치, "loc": 글자 위치 또는 None}, 그리고 옮긴 기록.
     """
-    groups = {}
+    groups, plan = {}, {}
     for i, it in enumerate(items):
+        if it["orient"] == "A":                  # 정렬 치수(사선)는 자리를 옮기지 않는다
+            plan[i] = {"q": None, "loc": None}
+            continue
         hz = it["orient"] == "H"
         q = it["line"][1] if hz else it["line"][0]
         e = it.get("ext", q - 800 if hz else q + 800)
         groups.setdefault((it["orient"], round(q), 1 if q >= e else -1), []).append((i, it, e))
-    lines, texts, plan, moved = [], [], {}, []      # 이미 놓은 치수선, 치수 글자
+    lines, texts, moved = [], [], []      # 이미 놓은 치수선, 치수 글자
 
     def tw(it):
         return text_width(str(it["value"]), h)

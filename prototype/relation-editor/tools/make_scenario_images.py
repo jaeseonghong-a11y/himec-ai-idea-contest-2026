@@ -43,6 +43,7 @@ if pdf.exists():
     pg.get_pixmap(dpi=380, clip=pymupdf.Rect(r.width * 0.13, r.height * 0.30, r.width * 0.29, r.height * 0.52)).save(str(DST / "b6_walls.png"))
     pg.get_pixmap(dpi=300, clip=pymupdf.Rect(r.width * 0.20, r.height * 0.42, r.width * 0.50, r.height * 0.64)).save(str(DST / "b7_lineweights.png"))
     pg.get_pixmap(dpi=170, clip=pymupdf.Rect(r.width * 0.58, r.height * 0.2, r.width * 0.97, r.height * 0.6)).save(str(DST / "b8_schedules.png"))
-    print("AutoCAD 출력 그림 5장")
+    pg.get_pixmap(dpi=380, clip=pymupdf.Rect(r.width * 0.33, r.height * 0.55, r.width * 0.50, r.height * 0.72)).save(str(DST / "b9_diagonal.png"))
+    print("AutoCAD 출력 그림 6장")
 else:
     print("AutoCAD 출력(NEW1T_autocad.pdf)이 없어 건너뜀. python tools/verify_generated_autocad.py NEW1T 를 먼저 실행")

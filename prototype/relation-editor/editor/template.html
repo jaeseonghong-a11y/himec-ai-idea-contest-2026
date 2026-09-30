@@ -62,6 +62,7 @@
     <button data-mode="select" class="on">선택·이동</button>
     <button data-mode="column">+ 기둥</button>
     <button data-mode="wall">+ 벽</button>
+    <button data-mode="diag" title="그리드 교점 두 개를 차례로 클릭">+ 사선</button>
     <button data-mode="beam">+ 보</button>
     <button data-mode="door">+ 문</button>
     <button data-mode="window">+ 창호</button>
@@ -124,7 +125,8 @@ function beamLw(g, kind, span) { const r = lwRules(g).beam, st = (r.span.find(x 
 function beamMembers(g, N) {
   // 보 부재: 같은 그리드 위에서 이어진 보 구간을 받침점(기둥, 또는 직각 방향 보가 닿거나 지나가는 교점)에서 끊어 한 부재로 본다.
   // 양 끝이 모두 기둥이면 거더, 아니면 보. 경간은 부재의 길이
-  const out = [], bs = g.edges.filter(e => e.beam);
+  const out = [], bs = g.edges.filter(e => e.beam && !e.diag);
+  g.edges.filter(e => e.beam && e.diag).forEach(e => { const a = N[e.from], b = N[e.to]; out.push({ along: null, edges: [e], from: a, to: b, span: e.length, kind: a.type === "column" && b.type === "column" ? "girder" : "beam" }); });
   const support = (n, gid) => n.type === "column" || bs.some(e => { if (e.along === gid || g.grids[e.along].axis === g.grids[gid].axis) return false;
     if (e.from === n.id || e.to === n.id) return true;
     const ax = g.grids[e.along].axis === "x" ? 1 : 0, a = N[e.from].xy, b = N[e.to].xy;      // 교점을 지나가는 거더·보
@@ -278,6 +280,8 @@ function dimObstacles(g) {
   const out = [], N = idx(g.nodes), add = (what, box, own) => out.push({ what, box, own });
   g.nodes.forEach(n => { if (n.type === "column") { const sp = parseSpec(n.spec); add("기둥", [n.xy[0] - sp.w / 2, n.xy[1] - sp.h / 2, n.xy[0] + sp.w / 2, n.xy[1] + sp.h / 2]); } });
   g.edges.forEach(e => { if (!e.wall) return; const a = N[e.from].xy, b = N[e.to].xy, t = (e.thick || 200) / 2 + 50;      // 보는 위에 있는 부재(은선)라 치수가 지나가도 된다
+    if (e.diag) { const n = 8; for (let i = 0; i < n; i++) { const p = [a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n], q = [a[0] + (b[0] - a[0]) * (i + 1) / n, a[1] + (b[1] - a[1]) * (i + 1) / n];
+      add("벽", [Math.min(p[0], q[0]) - t, Math.min(p[1], q[1]) - t, Math.max(p[0], q[0]) + t, Math.max(p[1], q[1]) + t]); } return; }
     add("벽", [Math.min(a[0], b[0]) - t, Math.min(a[1], b[1]) - t, Math.max(a[0], b[0]) + t, Math.max(a[1], b[1]) + t]); });
   g.openings.forEach(o => { const dp = o.type === "door" ? o.width / (o.leaves || 1) + 100 : 450, w = o.width / 2 + 100;
     add(o.type === "door" ? "문" : "창호", o.horiz ? [o.xy[0] - w, o.xy[1] - dp, o.xy[0] + w, o.xy[1] + dp] : [o.xy[0] - dp, o.xy[1] - w, o.xy[0] + dp, o.xy[1] + w]); });
@@ -301,6 +305,10 @@ function detailDims(g) {
     });
   });
   // 치수가 차지하는 자리(도면을 그릴 때의 검사와 같은 여유): 치수선 양쪽 200, 글자 높이 250과 여유. 치수 끝이 닿는 벽·보·기둥은 끝에서 250 안쪽부터 본다
+  { const cs = g.nodes.length ? [g.nodes.reduce((s, n) => s + n.xy[0], 0) / g.nodes.length, g.nodes.reduce((s, n) => s + n.xy[1], 0) / g.nodes.length] : [0, 0];
+    g.edges.filter(e => e.wall && e.diag).forEach(e => { const a = N[e.from].xy, b = N[e.to].xy, L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; let nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L;
+      const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2; if ((mx - cs[0]) * nx + (my - cs[1]) * ny < 0) { nx = -nx; ny = -ny; }      // 건물 중심에서 먼 쪽
+      const t = (e.thick || 200) / 2; out.push({ id: `DA-${e.id}`, kind: "diag", orient: "A", p1: a, p2: b, n: [Math.round(nx * 1e4) / 1e4, Math.round(ny * 1e4) / 1e4], off: t + 900, ext: t + 80, value: Math.round(L) }); }); }
   const obs = dimObstacles(g), touch = ["벽", "보", "기둥"];
   const hit = (H, a, b, lo, hi, own) => obs.filter(o => { if (o.own === own) return false; const k = touch.includes(o.what) ? 250 : 0, bx = H ? [a + k, lo, b - k, hi] : [lo, a + k, hi, b - k];
     return bx[0] <= o.box[2] && bx[2] >= o.box[0] && bx[1] <= o.box[3] && bx[3] >= o.box[1]; });
@@ -451,7 +459,7 @@ function recompute(g) {
   });
   g.edges.forEach(e => {
     const a = N[e.from].xy, b = N[e.to].xy;
-    e.length = Math.round(Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]));
+    e.length = Math.round(Math.hypot(a[0] - b[0], a[1] - b[1]));
     E[e.id] = e;
   });
   g.edges.forEach(e => { e.wall_lw = e.wall ? wallLw(g, e.thick || 200) : null; if (!e.beam) { e.beam_kind = e.beam_span = e.beam_lw = null; } });
@@ -680,11 +688,28 @@ function deleteColumn(g, id) {
 function addEdge(g, seg, kind) {
   const na = ensureNode(g, seg.a.xi, seg.a.yj), nb = ensureNode(g, seg.b.xi, seg.b.yj);
   let e = findEdge(g, na.id, nb.id);
-  if (!e) { e = { id: `${na.id}~${nb.id}`, from: na.id, to: nb.id, along: seg.along, length: 0, wall: false, wall_cover: 0, beam: false, beam_evidence: null, thick: (g.project && g.project.wall_thick) || 200, added: true }; g.edges.push(e); }
+  if (!e) { e = { id: `${na.id}~${nb.id}`, from: na.id, to: nb.id, along: seg.along || null, diag: !seg.along, length: 0, wall: false, wall_cover: 0, beam: false, beam_evidence: null, thick: (g.project && g.project.wall_thick) || 200, added: true }; g.edges.push(e); }
   if (e[kind]) return null;
   e[kind] = true;
   if (kind === "beam" && !e.beam_evidence) e.beam_evidence = "added";
   recompute(g); return e.id;
+}
+function outsideDiagonal(g) {
+  // 사선 벽의 바깥쪽(건물 중심 반대편)에 남은 기구. 모서리를 잘라 내면 구획 비율로 놓인 기구가 밖에 남을 수 있다
+  const N = idx(g.nodes), out = [];
+  if (!g.mep || !g.nodes.length) return out;
+  const cs = [g.nodes.reduce((s, n) => s + n.xy[0], 0) / g.nodes.length, g.nodes.reduce((s, n) => s + n.xy[1], 0) / g.nodes.length];
+  g.edges.filter(e => e.wall && e.diag).forEach(e => { const a = N[e.from].xy, b = N[e.to].xy, L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; let nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L;
+    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2; if ((mx - cs[0]) * nx + (my - cs[1]) * ny < 0) { nx = -nx; ny = -ny; }
+    const x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]), y0 = Math.min(a[1], b[1]), y1 = Math.max(a[1], b[1]);
+    g.mep.devices.forEach(d => { if (!d.xy || d.xy[0] < x0 || d.xy[0] > x1 || d.xy[1] < y0 || d.xy[1] > y1) return;
+      if ((d.xy[0] - a[0]) * nx + (d.xy[1] - a[1]) * ny > (e.thick || 200) / 2) out.push({ device: d.id, edge: e.id }); }); });
+  return out;
+}
+function addDiagonal(g, a, b, kind) {
+  // 사선 벽·보: 서로 다른 세로·가로 그리드에 있는 두 교점을 잇는다. 그리드는 그대로 둔다
+  if (!a || !b || a.xi === b.xi || a.yj === b.yj) return null;
+  return addEdge(g, { a, b, along: null }, kind);
 }
 function deleteEdgeKind(g, id, kind) {
   const e = g.edges.find(x => x.id === id);
@@ -776,8 +801,9 @@ function diff(orig, g) {
 function rawWarnings(orig, g) {
   const w = [], d = diff(orig, g), N = idx(g.nodes);
   d.edges.forEach(e => { if (e.beam && e.to > SPAN_WARN && e.to > e.from) w.push(`${e.id} 보 스팬 ${e.from} → ${e.to} mm, 기준 ${SPAN_WARN} 초과. 보 단면 재검토`); });
-  d.beams_added.forEach(e => { const L = Math.abs(e.from_xy[0] - e.to_xy[0]) + Math.abs(e.from_xy[1] - e.to_xy[1]); if (L > SPAN_WARN) w.push(`${e.id} 새 보 스팬 ${L} mm, 기준 ${SPAN_WARN} 초과`); });
+  d.beams_added.forEach(e => { const L = Math.round(Math.hypot(e.from_xy[0] - e.to_xy[0], e.from_xy[1] - e.to_xy[1])); if (L > SPAN_WARN) w.push(`${e.id} 새 보 스팬 ${L} mm, 기준 ${SPAN_WARN} 초과`); });
   g.edges.forEach(e => {
+    if (e.diag) return;
     const horiz = g.grids[e.along].axis === "y", ends = [N[e.from], N[e.to]];
     const half = n => n.type === "column" ? (horiz ? parseSpec(n.spec).w : parseSpec(n.spec).h) / 2 : 0;
     const c0 = horiz ? ends[0].xy[0] : ends[0].xy[1], c1 = horiz ? ends[1].xy[0] : ends[1].xy[1], s = Math.min(c0, c1), t = Math.max(c0, c1);
@@ -800,7 +826,7 @@ function rawWarnings(orig, g) {
     if (pi.coverage !== null && pi.coverage > 60) w.push(`개략 건폐율 ${pi.coverage}%. 60% 초과(기준은 용도지역에 따라 다름, 데모용 가정)`);
   }
   { const N2 = idx(g.nodes), seen = new Set();      // 벽 두께
-    g.edges.filter(e => e.wall).forEach(e => { [e.from, e.to].forEach(id => { const n = N2[id]; if (!n || n.type !== "column" || !n.spec) return; const sp = parseSpec(n.spec), lim = g.grids[e.along].axis === "y" ? sp.h : sp.w;
+    g.edges.filter(e => e.wall && !e.diag).forEach(e => { [e.from, e.to].forEach(id => { const n = N2[id]; if (!n || n.type !== "column" || !n.spec) return; const sp = parseSpec(n.spec), lim = g.grids[e.along].axis === "y" ? sp.h : sp.w;
       if (e.thick > lim && !seen.has(e.id)) { seen.add(e.id); w.push(`벽 ${e.id}: 두께 ${e.thick}이 기둥 ${n.grid.join("-")}의 폭 ${lim}보다 커서 기둥 밖으로 나옴`); } });
       g.openings.filter(o => o.on_edge === e.id).forEach(o => { const ot = (g.otypes || []).find(t => t.id === o.otype);
         if (ot && ot.donor && !ot.virtual && e.thick !== 200 && thickEditable(g, e)) w.push(`${o.type === "door" ? "문" : "창호"} ${o.id}: ${ot.id} 기호는 원본 도면의 벽에 맞춰 그려진 것이라 벽 두께 ${e.thick}에서는 맞는지 확인 필요`); }); });
@@ -820,6 +846,7 @@ function rawWarnings(orig, g) {
     if (r.walls.length === 0) w.push(`${c.id} ${t.name}: 둘러싼 벽이 하나도 없음`);
     cs.slice(i + 1).forEach(o => { const q = o.rect; if (r.x0 < q.x1 - 1 && r.x1 > q.x0 + 1 && r.y0 < q.y1 - 1 && r.y1 > q.y0 + 1) w.push(`${c.id}와 ${o.id}가 겹침`); });
   });
+  outsideDiagonal(g).forEach(x => w.push(`${x.device}: 사선 벽 ${x.edge} 바깥에 남음. 옮기거나 지워야 함`));
   mepWarnings(g).forEach(x => w.push(x));
   return w;
 }
@@ -860,7 +887,7 @@ function exportChanges(orig, g, reviewer) {
     `${c.id} ${coreType(c.type).name} ${c.anchor.join("-")} 방향 ${c.dir}, 입구 ${SIDE_NAME[c.rect.entry]}, 벽 ${["N", "E", "S", "W"].filter(k => c.rect.flags[k]).map(k => SIDE_NAME[k]).join("·") || "없음"}` + (c.rect.calc ? ` (층고 ${c.rect.calc.floor_height}, ${c.rect.calc.risers}단, 단높이 ${c.rect.calc.riser})` : "")));
   if (g.auto_dims && (g.dims.length || g.dims2.length)) add("DIMS", "add_dims", { items: [
       ...g.dims.map(x => ({ kind: "grid", orient: x.orient, a: g.grids[x.from_grid].coord, b: g.grids[x.to_grid].coord, line: x.line, value: x.measurement })),
-      ...g.dims2.map(x => ({ kind: x.kind, orient: x.orient, a: x.a, b: x.b, line: x.orient === "H" ? [x.a, x.at] : [x.at, x.a], ext: x.ext, value: x.value })) ] },
+      ...g.dims2.map(x => x.orient === "A" ? { kind: x.kind, orient: "A", p1: x.p1, p2: x.p2, n: x.n, off: x.off, ext: x.ext, value: x.value } : { kind: x.kind, orient: x.orient, a: x.a, b: x.b, line: x.orient === "H" ? [x.a, x.at] : [x.at, x.a], ext: x.ext, value: x.value }) ] },
     `치수 자리: ${Object.values(g.dim_layout || {}).map(x => `${x.side} ${x.mode}`).join(", ")}. 치수 자동 생성: 그리드 ${g.dims.length}개, 문·창호 위치 ${g.dims2.filter(x => x.kind === "opening").length}개, 코어 ${g.dims2.filter(x => x.kind === "core").length}개`);
   if (g.auto_dims && g.nodes.length) add("SCHEDULE", "add_schedule", scheduleTables(g), "일람표(기둥, 문·창호, 코어)");
   // 설비·전기·소방: 건축 변경을 따라 자동으로 옮겨진 것과 직접 편집한 것
@@ -918,6 +945,12 @@ function newProjectShowcase(g) {
   addGridFree(g, "y", yb0); addGridFree(g, "x", xb0);
   const yb = gid("y", yb0), xb = gid("x", xb0), beam = (a, b, along) => addEdge(g, { a: { xi: a[0], yj: a[1] }, b: { xi: b[0], yj: b[1] }, along }, "beam");
   beam([xs[1].id, yb], [xs[2].id, yb], yb); beam([xs[2].id, yb], [xb, yb], yb); beam([xb, yb], [xs[3].id, yb], yb); beam([xb, ys[0].id], [xb, yb], xb);
+  { const nd = (x, y) => g.nodes.find(n => n.grid[0] === x && n.grid[1] === y), c = nd(xs[3].id, ys[0].id), p = nd(xs[2].id, ys[0].id), q = nd(xs[3].id, ys[1].id);
+    [[c, p], [c, q]].forEach(([u, v]) => { const e = findEdge(g, u.id, v.id); if (!e) return; g.mep.devices.filter(d => d.host && d.host.edge === e.id).forEach(d => deleteDevice(g, d.id)); ["wall", "beam"].forEach(k => { if (e[k]) deleteEdgeKind(g, e.id, k); }); });
+    deleteColumn(g, c.id);
+    addDiagonal(g, { xi: xs[2].id, yj: ys[0].id }, { xi: xs[3].id, yj: ys[1].id }, "wall"); addDiagonal(g, { xi: xs[2].id, yj: ys[0].id }, { xi: xs[3].id, yj: ys[1].id }, "beam");
+    recompute(g); const gone = outsideDiagonal(g); gone.forEach(x => deleteDevice(g, x.device));
+    log.push(`오른쪽 아래 모서리를 사선으로 자름 (기둥 하나 제거, 사선 벽·보 추가, 밖에 남은 기구 ${gone.length}개 삭제)`); }
   recompute(g);
   log.push(`거더 ${g.members.filter(m => m.edges[0].beam_kind === "girder").length}개, 보 ${g.members.filter(m => m.edges[0].beam_kind === "beam").length}개 (경간 ${[...new Set(g.members.filter(m => m.edges[0].beam_kind === "beam").map(m => m.span))].sort((a, b) => a - b).join(", ")})`);
   return log;
@@ -926,7 +959,7 @@ function demoScenario(g) {
   if (!Object.keys(g.grids).length) return newProjectDemo(g);
   const log = [], N = () => idx(g.nodes), lab = id => N()[id].grid.join("-");
   const horizE = e => g.grids[e.along].axis === "y", mid = e => { const a = N()[e.from].xy, b = N()[e.to].xy; return horizE(e) ? (a[0] + b[0]) / 2 : (a[1] + b[1]) / 2; };
-  const free = e => e.wall && !g.openings.some(o => o.on_edge === e.id) && ![N()[e.from], N()[e.to]].some(n => n.type === "column");
+  const free = e => e.wall && !e.diag && !g.openings.some(o => o.on_edge === e.id) && ![N()[e.from], N()[e.to]].some(n => n.type === "column");
   // 1) 기둥이 가장 많은 세로 그리드를 +500
   const gx = Object.values(g.grids).filter(x => x.axis === "x").map(x => ({ id: x.id, n: g.nodes.filter(n => n.type === "column" && n.grid[0] === x.id).length })).sort((a, b) => b.n - a.n)[0];
   if (gx && gx.n) { moveGridTo(g, gx.id, g.grids[gx.id].coord + 500); log.push(`${gx.id} +500`); }
@@ -963,13 +996,13 @@ function demoScenario(g) {
     const wd = g.mep.devices.find(x => x.type === "EO1" && x.host && x.host.kind === "wall" && !x.orphan && !g.openings.some(o => o.on_edge === x.host.edge));
     if (wd) { wd.shift = 300; log.push(`${wd.id} 콘센트 이동 +300`); }
     const li = g.mep.devices.filter(x => x.type === "EL1").pop(); if (li) { deleteDevice(g, li.id); log.push(`${li.id} 조명 삭제`); }
-    const we = g.edges.filter(e => e.wall && !g.openings.some(o => o.on_edge === e.id) && !g.mep.devices.some(x => x.host && x.host.edge === e.id) && e.length >= 1500).sort((a, b) => b.length - a.length)[0];
+    const we = g.edges.filter(e => e.wall && !e.diag && !g.openings.some(o => o.on_edge === e.id) && !g.mep.devices.some(x => x.host && x.host.edge === e.id) && e.length >= 1500).sort((a, b) => b.length - a.length)[0];
     if (we) { const id = addDevice(g, "EO1", { edge: we.id, a: mid(we), side: 1 }); log.push(`콘센트 추가 ${id} (${lab(we.from)}~${lab(we.to)})`); }
     recompute(g);
   }
   return log;
 }
-if (typeof module !== "undefined") module.exports = { newProjectShowcase, LW_DEFAULT, wallLw, beamLw, beamMembers, clampThick, coreWallThick, setWallThick, thickEditable, anchorOffset, siteSpan, dimObstacles, layoutDims, DIM_FIT, entryChoices, stairLead, coreEntry, coreWallFlags, coreDetail, detailDims, scheduleTables, CORE_TYPES, stairCalc, coreRect, addCore, deleteCore, setSite, addGridFree, addGridSeries, autoDims, projectInfo, polyArea, newProjectDemo, addDevice, deleteDevice, mepDiff, mepWarnings, addOpeningType, initModel, recompute, moveGridTo, addGrid, deleteGrid, intersections, candidateSegments, nodeAt, findEdge, addColumn, deleteColumn, addEdge, deleteEdgeKind, addOpening, deleteOpening, diff, warnings, exportChanges, gridLimits, demoScenario, clone, idx };
+if (typeof module !== "undefined") module.exports = { outsideDiagonal, addDiagonal, newProjectShowcase, LW_DEFAULT, wallLw, beamLw, beamMembers, clampThick, coreWallThick, setWallThick, thickEditable, anchorOffset, siteSpan, dimObstacles, layoutDims, DIM_FIT, entryChoices, stairLead, coreEntry, coreWallFlags, coreDetail, detailDims, scheduleTables, CORE_TYPES, stairCalc, coreRect, addCore, deleteCore, setSite, addGridFree, addGridSeries, autoDims, projectInfo, polyArea, newProjectDemo, addDevice, deleteDevice, mepDiff, mepWarnings, addOpeningType, initModel, recompute, moveGridTo, addGrid, deleteGrid, intersections, candidateSegments, nodeAt, findEdge, addColumn, deleteColumn, addEdge, deleteEdgeKind, addOpening, deleteOpening, diff, warnings, exportChanges, gridLimits, demoScenario, clone, idx };
 </script>
 
 <script id="ui">
@@ -977,11 +1010,11 @@ if (typeof module !== "undefined") module.exports = { newProjectShowcase, LW_DEF
 (function () {
   if (typeof document === "undefined" || !ORIG_GRAPH) return;
   const ORIG = recompute(initModel(ORIG_GRAPH));
-  let G = clone(ORIG), undo = [], sel = null, vb = null, mode = "select";
+  let G = clone(ORIG), undo = [], sel = null, vb = null, mode = "select", diagFirst = null;
   const svg = document.getElementById("svg"), $ = id => document.getElementById(id);
   $("title").textContent = `관계도 편집기 — ${ORIG.sheet}` + (ORIG.source === "pdf" ? " (PDF에서 읽음)" : "");
   const RED = "#d62728", NEW = "#0a8f3c", SEL = "#1f6feb";
-  const HINTS = { select: "그리드선을 끌어 이동 · 기둥·벽·보·문·창호를 클릭해 편집하거나 삭제(Delete) · 빈 곳 끌기 = 화면 이동 · 휠 = 확대",
+  const HINTS = { diag: "사선 벽: 시작 교점을 클릭한 뒤 끝 교점을 클릭 (다른 세로·가로 그리드에 있는 교점). 보는 만든 뒤 오른쪽에서 켬", select: "그리드선을 끌어 이동 · 기둥·벽·보·문·창호를 클릭해 편집하거나 삭제(Delete) · 빈 곳 끌기 = 화면 이동 · 휠 = 확대",
     column: "기둥을 놓을 그리드 교점(초록 원)을 클릭", wall: "벽을 놓을 그리드 구간(초록 띠)을 클릭", beam: "보를 놓을 그리드 구간(초록 띠)을 클릭",
     door: "문을 놓을 벽 위의 위치를 클릭", window: "창호를 놓을 벽 위의 위치를 클릭", core: "코어 종류를 고른 뒤 기준이 될 그리드 교점을 클릭. 방향과 옆은 선택 후 오른쪽에서 바꿈", gridx: "세로 그리드를 놓을 위치를 클릭", gridy: "가로 그리드를 놓을 위치를 클릭",
     site: "대지경계선의 꼭짓점을 차례로 클릭하고 오른쪽의 [대지 완성]을 누름. 사각형은 오른쪽에 가로·세로를 입력", device: "기구 종류를 고른 뒤, 벽 부착 기구는 벽을, 구획 배치 기구는 실내의 위치를 클릭" };
@@ -1088,12 +1121,12 @@ if (typeof module !== "undefined") module.exports = { newProjectShowcase, LW_DEF
     G.edges.forEach(e => {
       const a = N[e.from].xy, b = N[e.to].xy, h = hot.edges.has(e.id), horiz = a[1] === b[1], sl = isSel("edge", e.id);
       if (e.wall) s += `<line pointer-events="none" x1="${a[0]}" y1="${-a[1]}" x2="${b[0]}" y2="${-b[1]}" stroke="${sl ? SEL : fresh.walls.has(e.id) ? NEW : h ? RED : "#333"}" stroke-width="${Math.max(60, e.thick * 0.5) + (h || sl ? 30 : 0)}"/>`;      // 벽은 두께 그대로(절반 축척), 도면에서는 선 굵기 ${""}가 두께에 따라 달라진다
-      if (e.beam) { const off = e.wall ? 170 : 0, ox = horiz ? 0 : off, oy = horiz ? off : 0, c = sl ? SEL : fresh.beams.has(e.id) ? NEW : h ? RED : "#1f77b4";
+      if (e.beam) { const off = e.wall ? 170 : 0, L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ox = e.diag ? -(b[1] - a[1]) / L * off : horiz ? 0 : off, oy = e.diag ? (b[0] - a[0]) / L * off : horiz ? off : 0, c = sl ? SEL : fresh.beams.has(e.id) ? NEW : h ? RED : "#1f77b4";
         s += `<line pointer-events="none" x1="${a[0] + ox}" y1="${-(a[1] + oy)}" x2="${b[0] + ox}" y2="${-(b[1] + oy)}" stroke="${c}" stroke-width="${(e.beam_lw || 25) * 1.7 + (h || sl ? 25 : 0)}" stroke-dasharray="${e.beam_kind === "girder" ? "300 170" : "170 130"}"/>`;
         const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
         s += horiz ? `<text x="${mx}" y="${-(my + 330)}" font-size="200" text-anchor="middle" fill="${c}">${e.length}</text>` : `<text transform="translate(${mx + 380},${-my}) rotate(-90)" font-size="200" text-anchor="middle" fill="${c}">${e.length}</text>`; }
       if (mode === "select") s += `<line class="e-hit" data-kind="edge" data-id="${esc(e.id)}" x1="${a[0]}" y1="${-a[1]}" x2="${b[0]}" y2="${-b[1]}"/>`;
-      if ((mode === "door" || mode === "window") && e.wall) s += `<line class="cand" data-kind="cand-wall" data-id="${esc(e.id)}" x1="${a[0]}" y1="${-a[1]}" x2="${b[0]}" y2="${-b[1]}" stroke="${NEW}" stroke-opacity=".25" stroke-width="420"/>`;
+      if ((mode === "door" || mode === "window") && e.wall && !e.diag) s += `<line class="cand" data-kind="cand-wall" data-id="${esc(e.id)}" x1="${a[0]}" y1="${-a[1]}" x2="${b[0]}" y2="${-b[1]}" stroke="${NEW}" stroke-opacity=".25" stroke-width="420"/>`;
     });
     // 창호·문
     G.openings.forEach(o => {
@@ -1111,6 +1144,8 @@ if (typeof module !== "undefined") module.exports = { newProjectShowcase, LW_DEF
         s += `<text x="${x}" y="${-y + 70}" font-size="190" text-anchor="middle" fill="${h || f ? "#fff" : "#000"}" font-weight="bold">${n.ctype}</text><text x="${x}" y="${-y + r + 260}" font-size="180" text-anchor="middle" fill="${f ? NEW : h ? RED : "#333"}">${n.spec}</text>`;
       } else s += `<circle cx="${x}" cy="${-y}" r="75" fill="${h ? RED : "#666"}" pointer-events="none"/>`;
     });
+    if (mode === "diag") intersections(G).forEach(q => { const first = diagFirst && diagFirst.xi === q.xi && diagFirst.yj === q.yj;
+      s += `<circle class="cand" data-kind="cand-diag" data-xi="${q.xi}" data-yj="${q.yj}" cx="${q.x}" cy="${-q.y}" r="${first ? 360 : 280}" fill="${NEW}" fill-opacity="${first ? ".55" : ".15"}" stroke="${NEW}" stroke-width="30"/>`; });
     if (mode === "core") intersections(G).forEach(q => { s += `<circle class="cand" data-kind="cand-core" data-xi="${q.xi}" data-yj="${q.yj}" cx="${q.x}" cy="${-q.y}" r="300" fill="#5d4037" fill-opacity=".15" stroke="#5d4037" stroke-width="30"/>`; });
     // 추가 후보 (기둥 교점)
     if (mode === "column") intersections(G).forEach(p => { const n = nodeAt(G, p.xi, p.yj); if (n && n.type === "column") return;
@@ -1128,7 +1163,7 @@ if (typeof module !== "undefined") module.exports = { newProjectShowcase, LW_DEF
         s += deviceShape(dv, c, ad.has(dv.id) ? "#d6f5e0" : "#fff", mode === "select" ? `class="clickable" data-kind="device" data-id="${dv.id}"` : 'pointer-events="none"', sl ? 50 : 24);
         if (dv.orphan) s += `<circle cx="${dv.xy[0]}" cy="${-dv.xy[1]}" r="230" fill="none" stroke="${RED}" stroke-width="30" stroke-dasharray="70 50" pointer-events="none"/>`; });
       if (mode === "device") { const t = G.mep.types.find(x => x.id === $("selDevice").value);
-        if (t && t.host === "wall") G.edges.filter(e => e.wall).forEach(e => { const a = N[e.from].xy, b = N[e.to].xy; s += `<line class="cand" data-kind="cand-dwall" data-id="${esc(e.id)}" x1="${a[0]}" y1="${-a[1]}" x2="${b[0]}" y2="${-b[1]}" stroke="${NEW}" stroke-opacity=".25" stroke-width="520"/>`; }); }
+        if (t && t.host === "wall") G.edges.filter(e => e.wall && !e.diag).forEach(e => { const a = N[e.from].xy, b = N[e.to].xy; s += `<line class="cand" data-kind="cand-dwall" data-id="${esc(e.id)}" x1="${a[0]}" y1="${-a[1]}" x2="${b[0]}" y2="${-b[1]}" stroke="${NEW}" stroke-opacity=".25" stroke-width="520"/>`; }); }
     }
     // 치수
     G.dims.forEach(dm => { if (!dm.attached) return;
@@ -1141,6 +1176,9 @@ if (typeof module !== "undefined") module.exports = { newProjectShowcase, LW_DEF
         : ["맨땅에서 시작합니다", "① 오른쪽에서 사각형 대지를 만들거나, 위의 [대지]를 눌러 꼭짓점을 찍습니다", "② 그리드를 만듭니다", "③ [+ 기둥] [+ 벽] [+ 보] [+ 문] [+ 창호] [+ 코어] [+ 기구]로 하나씩 얹습니다", "④ [변경 내보내기] 후 도면으로 그립니다"];
       steps.forEach((t, i) => { s += `<text x="${cx}" y="${cy + (i - steps.length / 2) * 900}" font-size="${i ? 420 : 620}" text-anchor="middle" fill="${i ? "#8a93a3" : "#4a5568"}">${t}</text>`; }); }
     (G.dims2 || []).forEach(dm => { const c = dm.kind === "core" ? "#8d6e63" : "#00897b";
+      if (dm.orient === "A") { const [nx, ny] = dm.n, p = [dm.p1[0] + nx * dm.off, dm.p1[1] + ny * dm.off], q = [dm.p2[0] + nx * dm.off, dm.p2[1] + ny * dm.off], m = [(p[0] + q[0]) / 2 + nx * 90, (p[1] + q[1]) / 2 + ny * 90];
+        let ang = -Math.atan2(q[1] - p[1], q[0] - p[0]) * 180 / Math.PI; if (ang > 90 || ang < -90) ang += 180;
+        s += `<g pointer-events="none"><line x1="${p[0]}" y1="${-p[1]}" x2="${q[0]}" y2="${-q[1]}" stroke="${c}" stroke-width="14"/><line x1="${dm.p1[0] + nx * dm.ext}" y1="${-(dm.p1[1] + ny * dm.ext)}" x2="${p[0] + nx * 150}" y2="${-(p[1] + ny * 150)}" stroke="${c}" stroke-width="10"/><line x1="${dm.p2[0] + nx * dm.ext}" y1="${-(dm.p2[1] + ny * dm.ext)}" x2="${q[0] + nx * 150}" y2="${-(q[1] + ny * 150)}" stroke="${c}" stroke-width="10"/><text transform="translate(${m[0]},${-m[1]}) rotate(${ang})" font-size="170" text-anchor="middle" fill="${c}">${dm.value}</text></g>`; return; }
       if (dm.orient === "H") s += `<g pointer-events="none"><line x1="${dm.a}" y1="${-dm.at}" x2="${dm.b}" y2="${-dm.at}" stroke="${c}" stroke-width="14"/><line x1="${dm.a}" y1="${-dm.at - 90}" x2="${dm.a}" y2="${-dm.at + 90}" stroke="${c}" stroke-width="14"/><line x1="${dm.b}" y1="${-dm.at - 90}" x2="${dm.b}" y2="${-dm.at + 90}" stroke="${c}" stroke-width="14"/><text x="${(dm.a + dm.b) / 2}" y="${-dm.at - 70}" font-size="170" text-anchor="middle" fill="${c}">${dm.value}</text></g>`;
       else s += `<g pointer-events="none"><line x1="${dm.at}" y1="${-dm.a}" x2="${dm.at}" y2="${-dm.b}" stroke="${c}" stroke-width="14"/><line x1="${dm.at - 90}" y1="${-dm.a}" x2="${dm.at + 90}" y2="${-dm.a}" stroke="${c}" stroke-width="14"/><line x1="${dm.at - 90}" y1="${-dm.b}" x2="${dm.at + 90}" y2="${-dm.b}" stroke="${c}" stroke-width="14"/><text transform="translate(${dm.at - 70},${-(dm.a + dm.b) / 2}) rotate(-90)" font-size="170" text-anchor="middle" fill="${c}">${dm.value}</text></g>`; });
     svg.innerHTML = s;
@@ -1245,9 +1283,9 @@ if (typeof module !== "undefined") module.exports = { newProjectShowcase, LW_DEF
     } else if (sel.kind === "edge") {
       const e = G.edges.find(x => x.id === sel.id), ops = G.openings.filter(o => o.on_edge === e.id);
       p.className = ""; p.innerHTML = `<div class="row"><label>구간</label><b>${label(N[e.from])} ~ ${label(N[e.to])}</b></div>
-        <div class="row"><label>그리드 / 길이</label>${e.along} / ${e.length} mm</div>
+        <div class="row"><label>그리드 / 길이</label>${e.diag ? "사선 (교점과 교점을 이음)" : e.along} / ${e.length} mm</div>
         <div class="row"><label>구성</label><label class="chk"><input type="checkbox" id="ckWall"${e.wall ? " checked" : ""}> 벽</label><label class="chk"><input type="checkbox" id="ckBeam"${e.beam ? " checked" : ""}> 보</label></div>
-        <div class="row"><label>벽 두께</label><input type="number" id="inThick" step="10" min="${THICK_MIN}" max="${THICK_MAX}" value="${e.thick}"${e.wall && thickEditable(G, e) ? "" : " disabled"}>${e.wall && thickEditable(G, e) ? `<button id="btnThickLine" title="같은 그리드 위의 벽 모두">${e.along} 위의 벽 모두</button>` : e.wall ? '<span class="muted">도면에 있던 벽은 두께를 바꿀 수 없음</span>' : ""}</div>
+        <div class="row"><label>벽 두께</label><input type="number" id="inThick" step="10" min="${THICK_MIN}" max="${THICK_MAX}" value="${e.thick}"${e.wall && thickEditable(G, e) ? "" : " disabled"}>${e.wall && thickEditable(G, e) && !e.diag ? `<button id="btnThickLine" title="같은 그리드 위의 벽 모두">${e.along} 위의 벽 모두</button>` : e.wall ? '<span class="muted">도면에 있던 벽은 두께를 바꿀 수 없음</span>' : ""}</div>
         ${e.wall ? `<div class="row"><label>벽선 굵기</label><span>${(e.wall_lw / 100).toFixed(2)} mm <span class="muted">(두께 ${e.thick}에 따라)</span></span></div>` : ""}
         ${e.beam ? `<div class="row"><label>보 종류</label><select id="inBK">${[["", `자동 (${e.beam_auto === "girder" ? "거더" : "보"})`], ["girder", "거더"], ["beam", "보"]].map(x => `<option value="${x[0]}"${(e.beam_kind_set || "") === x[0] ? " selected" : ""}>${x[1]}</option>`).join("")}</select></div>
         <div class="row"><label>경간 / 점선 굵기</label><span>${e.beam_span} mm / ${(e.beam_lw / 100).toFixed(2)} mm <span class="muted">(${e.beam_kind === "girder" ? "거더" : "보"}, 길수록 굵게)</span></span></div>` : ""}
@@ -1347,6 +1385,10 @@ if (typeof module !== "undefined") module.exports = { newProjectShowcase, LW_DEF
     else if (kind === "cand-wall") { const p = svgPt(ev), e = G.edges.find(x => x.id === t.dataset.id), horiz = G.grids[e.along].axis === "y"; const id = commit(() => addOpening(G, e.id, mode, horiz ? p.x : p.y)); if (id) { sel = { kind: "opening", id }; render(); } }
     else if (kind === "cand-dwall") { const p = svgPt(ev), e = G.edges.find(x => x.id === t.dataset.id), horiz = G.grids[e.along].axis === "y", c = G.grids[e.along].coord;
       const id = commit(() => addDevice(G, $("selDevice").value, { edge: e.id, a: horiz ? p.x : p.y, side: (horiz ? p.y : p.x) >= c ? 1 : -1 })); if (id) { sel = { kind: "device", id }; render(); } }
+    else if (kind === "cand-diag") { const q = { xi: t.dataset.xi, yj: t.dataset.yj };
+      if (!diagFirst) { diagFirst = q; render(); }
+      else if (diagFirst.xi === q.xi && diagFirst.yj === q.yj) { diagFirst = null; render(); }
+      else { const id = commit(() => addDiagonal(G, diagFirst, q, "wall")); diagFirst = null; if (id) { sel = { kind: "edge", id }; mode = "select"; } render(); } }
     else if (kind === "cand-core") { const id = commit(() => addCore(G, $("selCore").value, t.dataset.xi, t.dataset.yj, "N", 1)); if (id) { sel = { kind: "core", id }; mode = "select"; render(); } }
     else if (kind) { sel = { kind, id: t.dataset.id }; render(); }
     else if (mode === "gridx" || mode === "gridy") { const q = svgPt(ev); const id = commit(() => addGridFree(G, mode === "gridx" ? "x" : "y", mode === "gridx" ? q.x : q.y)); if (id) { sel = { kind: "grid", id }; render(); } }
@@ -1506,6 +1548,9 @@ if (typeof module !== "undefined") module.exports = { newProjectShowcase, LW_DEF
       setMode("wall"); for (let i = 0; i < 3; i++) { const c = q('[data-kind="cand-seg"]'); click(c, center(c)); }
       ok("+ 벽: 구간 3곳에 벽", G.edges.filter(e => e.wall).length === 3);
       setMode("beam"); { const c = q('[data-kind="cand-seg"]'); click(c, center(c)); }
+      setMode("diag"); { const cs = qa('[data-kind="cand-diag"]'), a = cs.find(c => c.dataset.xi === "X1" && c.dataset.yj === "Y1"), ne = G.edges.length; click(a, center(a));
+        const b = qa('[data-kind="cand-diag"]').find(c => c.dataset.xi === "X2" && c.dataset.yj === "Y2"); click(b, center(b));      // 첫 클릭 뒤 화면이 다시 그려지므로 다시 찾는다
+        const de = G.edges.find(e => e.diag); ok("+ 사선: 교점 두 개를 차례로 클릭하면 사선 벽이 생김", G.edges.length === ne + 1 && de && de.wall && (() => { const N0 = idx(G.nodes), p = N0[de.from].xy, q = N0[de.to].xy; return de.length === Math.round(Math.hypot(p[0] - q[0], p[1] - q[1])); })() && sel && sel.kind === "edge", de ? `(길이 ${de.length})` : `(구간 +${G.edges.length - ne})`); }
       ok("+ 보", G.edges.filter(e => e.beam).length === 1);
       setMode("window"); { const c = q('[data-kind="cand-wall"]'); click(c, center(c)); }
       setMode("door"); { const c = qa('[data-kind="cand-wall"]').find(e => !G.openings.some(o => o.on_edge === e.dataset.id)); click(c, center(c)); }

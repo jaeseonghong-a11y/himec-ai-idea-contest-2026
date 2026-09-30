@@ -14,6 +14,7 @@
 - 개구부 삭제: 기호를 지우고 끊어진 벽선을 다시 이음
 """
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -609,6 +610,14 @@ def do_add_dims(doc, ch, log):
     items = ch["params"]["items"]
     plan, moved = std.plan_dims(items, std.Obstacles(msp), ignore=std.mep_layers(std.load_profile()))      # 치수는 그 다음에 남은 자리에
     for i, it in enumerate(items):
+        if it["orient"] == "A":                       # 사선 벽의 정렬 치수: 벽에서 off 만큼 바깥쪽에
+            (x1, y1), (x2, y2), (nx, ny) = it["p1"], it["p2"], it["n"]
+            ang = math.degrees(math.atan2(y2 - y1, x2 - x1))
+            d = msp.add_linear_dim(base=((x1 + x2) / 2 + nx * it["off"], (y1 + y2) / 2 + ny * it["off"]), p1=(x1 + nx * it["ext"], y1 + ny * it["ext"]), p2=(x2 + nx * it["ext"], y2 + ny * it["ext"]),
+                                   angle=ang, dimstyle=style, override=ov, dxfattribs={"layer": "RXDIM"})
+            d.render(); n += 1
+            kinds["diag"] = kinds.get("diag", 0) + 1
+            continue
         q, loc = plan[i]["q"], plan[i]["loc"]
         if it["orient"] == "H":
             e = it.get("ext", it["line"][1] - 800)      # 치수보조선이 시작하는 곳(잰 대상 쪽)
@@ -623,7 +632,7 @@ def do_add_dims(doc, ch, log):
             log.append(f'{ch["id"]} 겹침 피하기: {"가로" if m["orient"] == "H" else "세로"} 치수 {m["count"]}개의 줄을 {m["from"]} → {m["to"]} ({abs(m["to"] - m["from"])} 바깥으로). 부딪힌 것: {", ".join(m["because"])}')
         else:
             log.append(f'{ch["id"]} 겹침 피하기: 치수 글자 {m["text"]}을 {abs(m["shift"])}만큼 옆으로. 부딪힌 것: 그리드선')
-    log.append(f'{ch["id"]} 치수 {n}개 생성: 그리드 {kinds.get("grid", 0)}, 문·창호 위치 {kinds.get("opening", 0)}, 코어 {kinds.get("core", 0)} (치수 스타일 {style})')
+    log.append(f'{ch["id"]} 치수 {n}개 생성: 그리드 {kinds.get("grid", 0)}, 문·창호 위치 {kinds.get("opening", 0)}, 코어 {kinds.get("core", 0)}, 사선 {kinds.get("diag", 0)} (치수 스타일 {style})')
     return {"added": n, **kinds}
 
 
@@ -715,28 +724,49 @@ def flush_walls(doc, log):
     prof = std.load_profile()
     r = wl.draw(doc, pend, wl.column_rects(doc))
     doc._himec_core_lines = r["by_owner"]
-    log.append(f'벽 맞물림: 벽 {r["walls"]}구간(코어 벽 포함)을 면으로 합쳐 외곽선 {r["lines"]}개로 그림. 기둥 {r["columns"]}개의 면에서 벽선을 끊고, 벽끼리 만나는 끝 {r["corners"]}곳을 채움')
+    log.append(f'벽 맞물림: 벽 {r["walls"]}구간(코어 벽 포함, 사선 {r["diagonal"]}구간)을 면으로 합쳐 외곽선 {r["lines"]}개로 그림. 기둥 {r["columns"]}개의 면에서 벽선을 끊고, 벽끼리 만나는 모서리 {r["corners"]}곳을 채움')
+
+
+def is_diag(p):
+    (x1, y1), (x2, y2) = p["from_xy"], p["to_xy"]
+    return abs(x1 - x2) > 1 and abs(y1 - y2) > 1
 
 
 def do_add_wall(doc, ch, log):
-    horiz, wall_c, s, e = seg_params(ch["params"])
-    t = ch["params"].get("thick", 200) / 2
+    p = ch["params"]
+    t = p.get("thick", 200) / 2
+    L = math.hypot(p["to_xy"][0] - p["from_xy"][0], p["to_xy"][1] - p["from_xy"][1])
+    kind = "사선 벽" if is_diag(p) else "벽"
     if getattr(doc, "_himec_union", False):      # 새 도면은 모아 두었다가 한꺼번에 합쳐 그린다
-        doc._himec_walls.append(wl.wall_rect(ch["params"], "WAL", lw=ch["params"].get("lw")))
-        log.append(f'{ch["id"]} 벽 추가 {ch["target"]}: 두께 {2 * t:.0f}, 길이 {e - s:.0f}')
+        doc._himec_walls.append(wl.wall_rect(p, "WAL", lw=p.get("lw")))
+        log.append(f'{ch["id"]} {kind} 추가 {ch["target"]}: 두께 {2 * t:.0f}, 길이 {L:.0f}')
         return {"added": 0, "merged": True}
     ensure_layer(doc, "WAL", 3)
     msp = doc.modelspace()
-    lw = ch["params"].get("lw")
-    for q in (wall_c - t, wall_c + t):
-        msp.add_line(pt(horiz, s, q), pt(horiz, e, q), dxfattribs={"layer": "WAL", **({"lineweight": lw} if lw else {})})
-    log.append(f'{ch["id"]} 벽 추가 {ch["target"]}: 두께 {2 * t:.0f}, 길이 {e - s:.0f}')
+    lw = p.get("lw")
+    for a_, b_ in wl.offset_lines(p["from_xy"], p["to_xy"], t):      # 기존 도면: 두 줄로 (사선도 같은 방식)
+        msp.add_line(a_, b_, dxfattribs={"layer": "WAL", **({"lineweight": lw} if lw else {})})
+    log.append(f'{ch["id"]} {kind} 추가 {ch["target"]}: 두께 {2 * t:.0f}, 길이 {L:.0f}')
     return {"added": 2}
 
 
 def do_add_beam(doc, ch, log):
+    p = ch["params"]
+    t = p.get("width", 400) / 2
+    if is_diag(p):                                   # 사선 보: 중심선 양쪽으로 비킨 두 선, 기둥 속은 뺀다
+        ensure_layer(doc, "HID", 8)
+        lt = next((n for n in ("HIDDEN", "HIDDEN2", "DASHED") if n in doc.linetypes), None)
+        attr = {"layer": "HID", **({"linetype": lt} if lt else {}), **({"lineweight": p["lw"]} if p.get("lw") else {})}
+        cols = wl.column_rects(doc) if getattr(doc, "_himec_union", False) else []
+        n = 0
+        for a_, b_ in wl.offset_lines(p["from_xy"], p["to_xy"], t):
+            for q1, q2 in wl.clip_line(a_, b_, cols):
+                doc.modelspace().add_line(q1, q2, dxfattribs=attr)
+                n += 1
+        L = math.hypot(p["to_xy"][0] - p["from_xy"][0], p["to_xy"][1] - p["from_xy"][1])
+        log.append(f'{ch["id"]} 사선 {"거더" if p.get("kind") == "girder" else "보"} 추가 {ch["target"]}: 폭 {2 * t:.0f}, 길이 {L:.0f}' + (f', 선 굵기 {p["lw"] / 100:.2f}' if p.get("lw") else ""))
+        return {"added": n}
     horiz, wall_c, s, e = seg_params(ch["params"])
-    t = ch["params"].get("width", 400) / 2
     ensure_layer(doc, "HID", 8)
     lt = next((n for n in ("HIDDEN", "HIDDEN2", "DASHED") if n in doc.linetypes), None)
     msp = doc.modelspace()
@@ -862,9 +892,7 @@ def apply(sheet, changes_path):
         for ch in changes:
             if ch["action"] == "add_core":
                 for w in ch["params"]["rect"].get("walls", []):
-                    hz = w["side"] in ("N", "S")
-                    doc._himec_walls.append({"box": [w["x0"], w["y0"], w["x1"], w["y1"]], "horiz": hz, "t": (w["y1"] - w["y0"] if hz else w["x1"] - w["x0"]) / 2, "ends": [],
-                                             "layer": std.layer_of(prof, "core_wall"), "owner": ch["target"], "lw": ch["params"]["rect"].get("wall_lw")})
+                    doc._himec_walls.append(wl.wall_from_box(w["x0"], w["y0"], w["x1"], w["y1"], std.layer_of(prof, "core_wall"), ch["target"], ch["params"]["rect"].get("wall_lw")))
     for action in ORDER:
         if is_new and action == "add_beam":      # 기둥과 벽이 모두 모인 뒤, 보·문·창호를 그리기 전에
             flush_walls(doc, log)
@@ -923,6 +951,8 @@ def roundtrip(dst, sheet, expected_path):
         """읽은 쪽은 그리드 교점마다 구간을 나눈다. 같은 줄 위의 벽 구간들이 이 벽을 빈틈없이 덮는지 본다."""
         (x1, y1), (x2, y2) = w["from_xy"], w["to_xy"]
         hz = abs(y1 - y2) < 1
+        if not hz and abs(x1 - x2) > 1:
+            return False, None                     # 사선 벽: 끝점으로 대조
         c0, s, e = (y1, min(x1, x2), max(x1, x2)) if hz else (x1, min(y1, y2), max(y1, y2))
         iv = []
         for (p1, p2), t in got_thick.items():

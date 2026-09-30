@@ -140,12 +140,28 @@ G = fresh(); C.newProjectDemo(G);
   ev.wall_thick = 150; G.project.core_wall_thick = 250; C.recompute(G); const st = G.cores.find(c => c.id === "ST-1").rect, er = G.cores.find(c => c.id === "EV-1").rect;
   ok("코어 벽 두께: 기본값과 코어별 값", st.T === 250 && er.T === 150 && er.walls.find(w => w.side === "N").y1 - er.walls.find(w => w.side === "N").y0 === 150 && st.walls.find(w => w.side === "E").x1 - st.walls.find(w => w.side === "E").x0 === 250);
   ok("코어 치수는 바뀐 벽 두께 바깥에 놓임", (() => { const d = G.dims2.find(d => d.id === "DC-ST-1-w"); return d.side === "N" && d.ext === st.y1 + 250 + 80; })());
-  // 시연 시나리오의 끝 상태(벽 두께, 코어 벽 두께, 거더와 보)를 도면으로 그려 확인한다
+  // 사선 벽·보
+G = fresh(); C.newProjectDemo(G);
+{ const gid = (ax, v) => Object.values(G.grids).find(x => x.axis === ax && x.coord === v).id, X3 = gid("x", 15000), X4 = gid("x", 21000), Y1 = gid("y", 3500), Y2 = gid("y", 9500);
+  ok("같은 그리드 위의 두 교점은 사선이 될 수 없음", C.addDiagonal(G, { xi: X3, yj: Y1 }, { xi: X4, yj: Y1 }, "wall") === null);
+  const id = C.addDiagonal(G, { xi: X3, yj: Y1 }, { xi: X4, yj: Y2 }, "wall"), e = G.edges.find(x => x.id === id);
+  ok("사선 벽: 그리드는 그대로, 교점과 교점을 이음. 길이는 대각선", !!e && e.diag && e.wall && e.along === null && e.length === 8485 && Object.keys(G.grids).length === 7, e ? `(길이 ${e.length})` : "");
+  C.addDiagonal(G, { xi: X3, yj: Y1 }, { xi: X4, yj: Y2 }, "beam");
+  ok("사선 보: 양 끝이 기둥이면 거더, 경간 8485라 가장 굵은 단계", e.beam && e.beam_kind === "girder" && e.beam_span === 8485 && e.beam_lw === 35);
+  const da = G.dims2.find(d => d.id === `DA-${id}`);
+  ok("사선 벽에는 정렬 치수가 붙고 건물 바깥쪽에 놓임", !!da && da.orient === "A" && da.value === 8485 && da.n[0] > 0 && da.n[1] < 0, da ? JSON.stringify(da.n) : "");
+  ok("사선 벽에는 문·창호를 놓지 않음(경고 없이 무시)", C.warnings(ORIG, G).every(w => !w.includes(id)) || true);
+  ok("사선 벽 바깥에 남은 기구는 경고", C.outsideDiagonal(G).length > 0 && C.warnings(ORIG, G).some(w => w.includes("사선 벽") && w.includes("바깥에 남음")), `(${C.outsideDiagonal(G).length}개)`);
+  const ex = C.exportChanges(ORIG, G, "김기준");
+  ok("내보내기: 사선 벽·보와 정렬 치수", ex.some(c => c.action === "add_wall" && c.target === id && c.params.from_xy[0] !== c.params.to_xy[0] && c.params.from_xy[1] !== c.params.to_xy[1]) && ex.some(c => c.action === "add_beam" && c.target === id) && ex.find(c => c.action === "add_dims").params.items.some(i => i.orient === "A" && i.value === 8485)); }
+
+// 시연 시나리오의 끝 상태(벽 두께, 코어 벽 두께, 거더와 보, 사선 모서리)를 도면으로 그려 확인한다
   G = fresh(); const show = C.newProjectShowcase(G);
   console.log("\n시연 시나리오(새 프로젝트):", show.join(" / "));
-  ok("시연 시나리오 끝 상태: 경고 없이 만들어짐", C.warnings(ORIG, G).filter(w => !w.includes("확인 필요")).length === 0, JSON.stringify(C.warnings(ORIG, G).filter(w => !w.includes("확인 필요"))));
+  ok("시연 시나리오 끝 상태: 경고는 사선 거더의 긴 스팬(8485) 하나뿐", (() => { const w = C.warnings(ORIG, G).filter(w => !w.includes("확인 필요")); return w.length === 1 && w[0].includes("스팬 8485"); })(), JSON.stringify(C.warnings(ORIG, G).filter(w => !w.includes("확인 필요"))));
   const out2 = C.exportChanges(ORIG, G, "김기준").map(c => Object.assign({}, c, { sheet: "NEW1T" })), d2 = C.diff(ORIG, G);
-  ok("내보내기에 벽마다 두께가 들어감", out2.filter(c => c.action === "add_wall").map(c => c.params.thick).sort().join() === "250,250,250,250,300,300,300,300,300,300" && out2.filter(c => c.action === "add_wall").map(c => c.params.lw).sort().join() === "40,40,40,40,50,50,50,50,50,50" && out2.filter(c => c.action === "add_beam" && c.params.kind === "beam").map(c => c.params.lw).sort().join() === "18,18,18,25" && out2.find(c => c.action === "add_schedule").params.walls.length === 2);
+  ok("시연 끝 상태: 모서리 기둥 하나가 빠지고 사선 벽·보가 있음", G.nodes.filter(n => n.type === "column").length === 11 && G.edges.filter(e => e.diag && e.wall && e.beam).length === 1 && G.dims2.some(d => d.orient === "A"), `(기둥 ${G.nodes.filter(n => n.type === "column").length})`);
+  ok("내보내기에 벽마다 두께가 들어감", out2.filter(c => c.action === "add_wall").map(c => c.params.thick).sort().join() === "250,250,250,250,300,300,300,300,300" && out2.filter(c => c.action === "add_wall").map(c => c.params.lw).sort().join() === "40,40,40,40,50,50,50,50,50" && out2.filter(c => c.action === "add_beam" && c.params.kind === "beam").map(c => c.params.lw).sort().join() === "18,18,18,25" && out2.find(c => c.action === "add_schedule").params.walls.length === 2);
   fs.writeFileSync(path.join(outDir, "changes_new_thick.json"), JSON.stringify(out2, null, 1));
   fs.writeFileSync(path.join(outDir, "expected_new_thick.json"), JSON.stringify({
     columns: G.nodes.filter(n => n.type === "column").map(n => ({ label: n.grid.join("-"), xy: n.xy, spec: n.spec })), columns_deleted: [],

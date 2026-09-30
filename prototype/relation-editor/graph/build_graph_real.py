@@ -259,7 +259,7 @@ def read_mep(msp, grids, nodes, edges):
             if all(k in grids for k in g4):
                 host = {"kind": "bay", "gx": g4[:2], "gy": g4[2:], "fx": float(parts[2]), "fy": float(parts[3])}
         if host is None and t["host"] == "wall":   # 관계가 심겨 있지 않으면 가장 가까운 벽으로 추정
-            att = attach_to_edge(xy, [e for e in edges if e["wall"]], N, 500)
+            att = attach_to_edge(xy, [e for e in edges if e["wall"] and e.get("along")], N, 500)      # 사선 벽에는 붙이지 않는다
             if att:
                 e = E[att[1]]
                 horiz = grids[e["along"]]["axis"] == "y"
@@ -267,7 +267,7 @@ def read_mep(msp, grids, nodes, edges):
                 host = {"kind": "wall", "edge": att[1], "side": 1 if (xy[1] if horiz else xy[0]) >= c else -1, "inferred": True}
         if host and host["kind"] == "wall":
             e = E.get(host["edge"])
-            if e and e["wall"]:
+            if e and e["wall"] and e.get("along"):
                 horiz = grids[e["along"]]["axis"] == "y"
                 host["a"] = xy[0] if horiz else xy[1]
                 host["offset"] = abs((xy[1] if horiz else xy[0]) - grids[e["along"]]["coord"])
@@ -283,6 +283,78 @@ def read_mep(msp, grids, nodes, edges):
     if not devices and not routes:
         return None
     return {"devices": devices, "routes": routes, "types": ms.TYPES, "rules": ms.RULES, "disciplines": ms.DISC, "virtual": True}
+
+
+# ---------- 사선 벽·보 ----------
+def _cover_dir(a, b, segs, off_tol, ang_tol=0.05):
+    """a→b 방향과 나란하고 그 선에서 off_tol 안에 있는 선분들이 a~b 를 덮는 비율과, 그 선분들의 직각 방향 위치들."""
+    ux, uy = b[0] - a[0], b[1] - a[1]
+    L = math.hypot(ux, uy)
+    if L < 1:
+        return 0.0, [], []
+    ux, uy = ux / L, uy / L
+    ivs, offs, hs = [], [], []
+    for s in segs:
+        vx, vy = s[2] - s[0], s[3] - s[1]
+        sl = math.hypot(vx, vy)
+        if sl < 50 or abs(ux * vy - uy * vx) / sl > ang_tol:
+            continue
+        d0 = (s[0] - a[0]) * -uy + (s[1] - a[1]) * ux
+        d1 = (s[2] - a[0]) * -uy + (s[3] - a[1]) * ux
+        if abs(d0) > off_tol or abs(d1) > off_tol:
+            continue
+        t0 = (s[0] - a[0]) * ux + (s[1] - a[1]) * uy
+        t1 = (s[2] - a[0]) * ux + (s[3] - a[1]) * uy
+        lo, hi = max(0.0, min(t0, t1)), min(L, max(t0, t1))
+        if hi - lo > 1:
+            ivs.append((lo, hi)); offs.append(((d0 + d1) / 2, hi - lo)); hs.append(s[4])
+    ivs.sort()
+    cov, cur = 0.0, -1.0
+    for lo, hi in ivs:
+        lo = max(lo, cur)
+        if hi > lo:
+            cov += hi - lo; cur = hi
+    return cov / L, offs, hs
+
+
+def diag_edges(joints, columns, key_of, wall_segs, hid_segs, wal_only, min_cover=0.4, min_len=1000):
+    """서로 다른 세로·가로 그리드에 있는 교점 쌍 가운데, 그 사이를 사선 벽선이 덮는 것을 찾는다."""
+    def slanted(segs):
+        return [s for s in segs if abs(s[0] - s[2]) > 1 and abs(s[1] - s[3]) > 1]
+    ws, hs_, wo = slanted(wall_segs), slanted(hid_segs), slanted(wal_only)
+    if not ws and not hs_:
+        return []
+    out, keys = [], list(joints)
+    for i, ka in enumerate(keys):
+        for kb in keys[i + 1:]:
+            if ka[0] == kb[0] or ka[1] == kb[1]:
+                continue
+            a, b = joints[ka]["xy"], joints[kb]["xy"]
+            if math.hypot(b[0] - a[0], b[1] - a[1]) < min_len:
+                continue
+            wc, _, wh = _cover_dir(a, b, ws, WALL_OFF)
+            hc, _, _ = _cover_dir(a, b, hs_, WALL_OFF)
+            both_col = ka in columns and kb in columns
+            is_wall, is_beam = bool(wc >= min_cover), bool(hc >= min_cover or (both_col and wc >= min_cover))
+            if not (is_wall or is_beam):
+                continue
+            thick = None
+            if is_wall:
+                _, offs, _ = _cover_dir(a, b, wo, WALL_OFF)
+                qs = [round(o) for o, ln in offs if ln >= 300]
+                thick = round(max(qs) - min(qs)) if len(qs) >= 2 else None
+            out.append({"id": f"{key_of(ka)}~{key_of(kb)}", "from": key_of(ka), "to": key_of(kb), "along": None, "diag": True,
+                        "length": round(math.hypot(b[0] - a[0], b[1] - a[1])), "wall": is_wall, "wall_cover": round(float(wc), 2), "wall_handles": wh,
+                        "thick_measured": thick, "beam": is_beam, "beam_evidence": "columns" if both_col else ("hidden-line" if hc >= min_cover else None), "_ka": ka, "_kb": kb})
+    # 같은 벽선을 여러 쌍이 나눠 갖지 않게, 긴 것부터 고르고 겹치는 짧은 것은 뺀다
+    out.sort(key=lambda e: -e["length"])
+    kept, used = [], set()
+    for e in out:
+        hset = set(e["wall_handles"])
+        if hset and hset & used:
+            continue
+        used |= hset; kept.append(e)
+    return kept
 
 
 # ---------- 코어, 대지 ----------
@@ -506,6 +578,16 @@ def build(dxf_path: Path, sheet: str):
                 "doors": [{"id": o["id"], "width": o["nominal"], "leaves": o.get("leaves", 1), "on": o["on_edge"]} for o in openings if o["type"] == "door"]}
     out = {"sheet": sheet, "dwg": dxf_path.name, "units": "mm", "naming": "그리드 명칭은 좌표순 자동 명명(도면 실제 명칭 미확인)",
            "grids": grids, "nodes": nodes, "edges": edges, "openings": openings, "dims": dims, "schedule": schedule}
+    diag = diag_edges(joints, columns, key_of, wall_segs, hid_segs, wal_only)      # 사선 벽·보 (그리드 교점과 교점을 잇는 것)
+    if diag:
+        have = {n["id"] for n in nodes}
+        for e in diag:
+            for k in (e["_ka"], e["_kb"]):
+                if key_of(k) not in have:
+                    nodes.append(joints[k]); have.add(key_of(k))
+            e.pop("_ka"); e.pop("_kb")
+        edges.extend(diag)
+        out["diagonal_edges"] = [e["id"] for e in diag]
     mep = read_mep(msp, grids, nodes, edges)
     if mep:
         out["mep"] = mep
@@ -668,6 +750,6 @@ if __name__ == "__main__":
         print("설비·전기·소방(가상):", dict(Counter(d["type"] for d in g["mep"]["devices"])), "| 덕트", len(g["mep"]["routes"]), "| 벽 부착", sum(1 for d in g["mep"]["devices"] if d["host"] and d["host"]["kind"] == "wall"), "구획 배치", sum(1 for d in g["mep"]["devices"] if d["host"] and d["host"]["kind"] == "bay"))
     print(f'grids {len(g["grids"])} | columns {ncol} joints {njoint} | edges {len(g["edges"])} (wall {nw}, beam {nb}) | windows {len(g["schedule"]["windows"])} doors {len(g["schedule"]["doors"])} | dims {len(g["dims"])} attached {sum(d["attached"] for d in g["dims"])}')
     for e in g["edges"]:
-        print(f'  {e["id"]:24s} {e["along"]:3s} L={e["length"]:5d} wall={e["wall"]!s:5s}({e["wall_cover"]:.2f}) beam={e["beam"]!s:5s} {e["beam_evidence"] or ""}')
+        print(f'  {e["id"]:24s} {(e["along"] or "사선"):3s} L={e["length"]:5d} wall={e["wall"]!s:5s}({e["wall_cover"]:.2f}) beam={e["beam"]!s:5s} {e["beam_evidence"] or ""}')
     for o in g["openings"]:
         print(f'  {o["id"]:4s} {o["type"]:6s} 호칭 {o["nominal"]:5d} ({o["nominal_src"]}, 기호 {o["width"]}) on {o["on_edge"]} t={o["t"]}')

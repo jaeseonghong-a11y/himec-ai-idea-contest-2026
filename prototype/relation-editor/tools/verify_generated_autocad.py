@@ -68,7 +68,7 @@ if res.exists():
         p = line.split()
         if len(p) >= 3:
             got.append((p[0], float(p[1]), float(p[2]), line[line.find("["):]))
-exp_path = ROOT / "out" / "editor" / "expected_new.json"
+exp_path = ROOT / "out" / "editor" / {"NEW1": "expected_new.json", "NEW1T": "expected_new_thick.json"}.get(sheet, f"expected_{sheet.lower()}.json")
 exp = sorted(d["value"] for d in json.loads(exp_path.read_text(encoding="utf-8")).get("auto_dims", [])) if exp_path.exists() and sheet.startswith("NEW") else None
 print(f"\n치수 {len(got)}개 (AutoCAD가 다시 계산한 값 / 정의점 사이 거리)")
 for h, m, dist, rest in got:

@@ -42,6 +42,8 @@ def main(src_sheet="A12", dst_sheet="A12M"):
         e = E.get(edge_id)
         if not e or not e["wall"]:
             return None
+        if not e.get("along"):
+            return None                              # 사선 벽에는 붙이지 않는다
         a, b = N[e["from"]]["xy"], N[e["to"]]["xy"]
         horiz = G[e["along"]]["axis"] == "y"
         if horiz:
