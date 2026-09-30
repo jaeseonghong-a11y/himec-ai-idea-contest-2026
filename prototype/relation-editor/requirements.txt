@@ -2,3 +2,4 @@ ezdxf>=1.4
 networkx>=3.0
 matplotlib>=3.8
 shapely>=2.0
+pymupdf>=1.24

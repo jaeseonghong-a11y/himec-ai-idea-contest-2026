@@ -87,7 +87,10 @@ const nodeOf = (G, x, y) => G.nodes.find(n => n.grid[0] === x && n.grid[1] === y
       { no: 3, target: "C1", change: "Y +300 mm", status: "confirmed", action: "move", axis: "Y", delta: 300 },       // 12개 → 보류
       { no: 4, target: "X9", change: "X +100 mm", status: "confirmed", action: "move", axis: "X", delta: 100 }];       // 없는 축
     const r = C.loadInstructions(G, items);
-    if (!(r[0].applied && r[1].applied && !r[2].applied && !r[3].applied)) note("S16", "이상", "지시 적용 결과가 기대와 다름: " + r.map(x => x.applied).join());
+    if (r.some(x => x.applied)) note("S16", "이상", "PDF 불러오기가 지시를 자동 적용함");
+    const c1 = C.applyInstruction(G, items[0], { node: nodeOf(G, "X2", "Y3") });
+    const c2 = C.applyInstruction(G, items[1], { grid: "Y1" });
+    if (!c1.ok || !c2.ok) note("S16", "이상", "사람이 확인한 그리드 이동 실패");
     const c4 = C.applyInstruction(G, items[2], { node: nodeOf(G, "X4", "Y2") }, true);      // 사람이 X4-Y2 기둥만으로 정함
     if (!c4.ok) note("S16", "이상", "기둥만 적용 실패: " + c4.note);
     save(C, ORIG, G, "S16", "S16", "지시 4건: 줄째 2건 적용, 보류 2건 중 1건은 사람이 기둥만으로 적용"); }

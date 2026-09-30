@@ -101,10 +101,23 @@ def entity_center(e):
     return None
 
 
+def is_column_entity(e):
+    """Only a known column block or a four-corner COL outline may be moved."""
+    if e.dxftype() == "INSERT":
+        return e.dxf.name.upper() == "COLUMN"
+    if e.dxftype() == "LWPOLYLINE" and e.closed and e.dxf.layer.upper() == "COL":
+        pts = list(e.get_points("xy"))
+        if len(pts) != 4:
+            return False
+        xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+        return 250 <= max(xs) - min(xs) <= 1200 and 250 <= max(ys) - min(ys) <= 1200
+    return False
+
+
 def find_by_handle(doc, handle):
     """플러그인이 적은 객체 핸들로 바로 찾는다. 모델 공간의 블록 참조나 폴리선이어야 한다."""
     e = doc.entitydb.get(handle)
-    if e is None or e.dxf.owner != doc.modelspace().block_record.dxf.handle:
+    if e is None or e.dxf.owner != doc.modelspace().block_record.dxf.handle or not is_column_entity(e):
         return None
     c = entity_center(e)
     if c is None:
@@ -135,9 +148,9 @@ def find_target(doc, tag, handle=None):
     tp = texts[0].dxf.insert
     cands = []
     for e in msp:
-        if e.dxftype() == "INSERT":
+        if e.dxftype() == "INSERT" and is_column_entity(e):
             cands.append((e, e.dxf.insert.x, e.dxf.insert.y))
-        elif e.dxftype() == "LWPOLYLINE" and e.closed:
+        elif e.dxftype() == "LWPOLYLINE" and is_column_entity(e):
             pts = [(p[0], p[1]) for p in e.get_points("xy")]
             xs, ys = [p[0] for p in pts], [p[1] for p in pts]
             if 250 <= max(xs) - min(xs) <= 1200 and 250 <= max(ys) - min(ys) <= 1200:

@@ -880,10 +880,13 @@ function applyInstruction(g, it, target, columnOnly) {
   return { ok: got === it.delta, note: `${gid} 그리드 ${from} → ${g.grids[gid].coord} (${it.delta > 0 ? "+" : ""}${it.delta})` + (got !== it.delta ? ` — 이웃 그리드 때문에 ${got}만 이동` : "") + (t.node ? `, 기둥 ${t.node.grid.join("-")}이 놓인 줄` : ""), grid: gid };
 }
 function loadInstructions(g, items) {
-  // 확정이고 대상이 하나로 정해지는 지시는 바로 적용, 나머지는 사람이 대상을 찍어 적용하도록 남긴다
+  // PDF를 불러오는 행위 자체는 도면 변경 승인이 아니다. 대상과 영향 범위를 화면에서 확인한 뒤 적용한다.
   return items.map(it => { const r = { ...it, applied: false, note: "" };
     if (it.status !== "confirmed") { r.note = "확정이 아님. 검토 뒤 대상을 찍어 적용할 수 있음"; return r; }
-    const a = applyInstruction(g, it); r.applied = a.ok; r.note = a.note; r.ask = !!a.ask; return r; });
+    const t = resolveInstruction(g, it);
+    r.note = t.ask || (t.node ? "대상 기둥을 찾음. 그리드 전체 또는 기둥만 이동할지 확인 후 적용" : t.grid ? "대상 그리드를 찾음. 화면에서 확인 후 적용" : "대상을 확인 후 적용");
+    r.ask = !!t.ask;
+    return r; });
 }
 function deleteEdgeKind(g, id, kind) {
   const e = g.edges.find(x => x.id === id);
