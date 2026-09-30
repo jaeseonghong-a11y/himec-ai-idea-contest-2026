@@ -1,5 +1,7 @@
 # 현재 브랜치 배정
 
+2026-09-30 원격 기준: `main` 외 작업 브랜치는 아래 3개뿐이다. 원칙은 팀원당 진행 브랜치 하나이지만, `archuni`의 서로 다른 과제 PR #34·#50이 둘 다 열려 있어 일시적으로 2개를 보존한다. 김기준 팀원의 PR #52는 병합됐고 `r02` 브랜치는 삭제했다. 새 작업은 팀장이 최신 `main`에서 다음 브랜치를 배정할 때까지 기다린다.
+
 ## AutoCAD 2024 호환 작업 — archuni 별도 과제 (2026-09-29)
 
 | 담당 | 지정 브랜치 | 이슈 | 담당 파일 |
@@ -10,29 +12,22 @@
 
 ## Round 02 — 설계 변경 피드백 루프 (2026-09-29)
 
-기준: `docs/PROJECT_BRIEF.md`, `prototype/CONTRACT.md`. 아래 `r02` 브랜치는 팀장이 2026-09-29 `main`의 `14f199e`에서 생성했고 원격 존재를 확인했다. 기존 `r01` 브랜치를 새 과제용으로 재사용하거나 팀원이 직접 새 브랜치를 만들지 않는다. 새 라운드 시작 요청문은 `prompts/ROUND_02_START.md`에 있다.
+기준: `docs/PROJECT_BRIEF.md`, `prototype/CONTRACT.md`. `r02` 브랜치들은 2026-09-29 `main`의 `14f199e`에서 출발했으나, 병합된 김기준 브랜치는 2026-09-30 정리됐다. 아래에서 실제 원격 존재 여부를 확인하고, 옛 `r01` 브랜치를 재사용하거나 팀원이 직접 새 브랜치를 만들지 않는다. 시작 요청문은 `prompts/ROUND_02_START.md`에 있다.
 
 | 담당 | 지정 브랜치 | 새 이슈 | 담당 파일 |
 |---|---|---|---|
-| `kijun-0108` | `work/kijun-0108/r02` (생성됨) | [#17 합성 도면·대본·사이드카](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/17) | `prototype/samples/`, `prototype/sidecar/` |
-| `archuni` | `work/archuni/r02` (생성됨) | [#18 변경지시 추출·PDF 주석·승인](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/18) | `prototype/extract/`, `prototype/annotate/` |
-| `ehgudwns18` | `work/ehgudwns18/r02` (생성됨) | [#20 경량 관계 그래프](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/20) | `prototype/graph/` |
+| `kijun-0108` | 배정 대기 (`r02` 삭제, PR #52 병합) | [#17 합성 도면·대본·사이드카](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/17)는 여전히 열려 있으며 PR #52와 별개 | 새 브랜치가 배정되기 전 작업·push 금지 |
+| `archuni` | `work/archuni/r02` — [PR #34 열림](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/34) | [#18 변경지시 추출·PDF 주석·승인](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/18) | `prototype/extract/`, `prototype/annotate/` |
+| `ehgudwns18` | `work/ehgudwns18/r02` — 원격 존재, 아직 작업 커밋 없음 | [#20 경량 관계 그래프](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/20) | `prototype/graph/` |
 | `jaeseonghong-a11y` | 팀장 전용 작업 브랜치 | [#19 합성 DXF 전파·검사](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/19), [#25 AutoCAD 플러그인 v0](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/25) | `prototype/propagate/`, `autocad-plugin/`, 통합·제출 문서 |
 
-Round 01의 조사 결과와 브랜치는 삭제하지 않는다. 아이디어 확정 전 후보 평가(`#7`, `#8`, PR `#14`)는 새 방향으로 대체되어 2026-09-29 이유를 남기고 종료했다. #9/PR #13의 구현 경로 조사는 이미 `main`에 반영했다.
+Round 01 조사 결과 중 병합된 것은 `main`과 PR 기록에 남아 있다. 닫혔지만 병합되지 않은 PR #14의 고유 내용은 `archive/archuni-r01-20260930` 태그로 보존하고 옛 브랜치를 삭제했다. 아이디어 확정 전 후보 평가(`#7`, `#8`, PR `#14`)는 새 방향으로 대체되어 2026-09-29 이유를 남기고 종료했다. #9/PR #13의 구현 경로 조사는 이미 `main`에 반영했다.
 
 팀원과 AI는 이 표의 브랜치를 임의로 바꾸거나 새로 만들지 않는다. 팀장 AI만 라운드를 갱신한다.
 
-## 팀원별 활성 배정 — 초기 Round 01
+## 옛 브랜치 정리 기록
 
-- 초기 기준선: 첫 `r01` 원격 브랜치들은 생성 당시 같은 `main`에서 출발했다. 이후 PR과 `main`이 진행됐으므로 현재 SHA는 같지 않을 수 있다.
-- 현재 상태는 아래 표와 GitHub PR·이슈의 실제 상태를 함께 확인한다.
-
-| GitHub 사용자 | 할당 브랜치 | 담당 이슈 | 상태 |
-|---|---|---|---|
-| `archuni` | `work/archuni/r01` | [#7 현장 문제 후보와 사용자 시나리오](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/7), `docs/candidates/field-problems.md` | [PR #14 수정 요청](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/14) |
-| `ehgudwns18` | `work/ehgudwns18/r01` | [#8 아이디어 비교와 평가 적합성](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/8), `docs/candidates/idea-comparison.md` | 브랜치 준비 |
-| `kijun-0108` | `work/kijun-0108/r01` | [#9 최소 데모 구현 경로](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/issues/9), `docs/candidates/prototype-feasibility.md` | [PR #13 병합 완료](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/13), 다음 배정 대기 |
+2026-09-30 병합 완료 PR의 브랜치 31개, 내용이 `main`에 이미 있는 `ehgudwns18/r01`, 태그로 보존한 `archuni/r01`을 삭제했다. 브랜치 삭제는 병합된 `main` 커밋·PR 기록·Release·보존 태그를 삭제하지 않는다. 열린 PR #34·#50의 브랜치와 현재 배정된 `ehgudwns18/r02`는 유지한다. PR 병합 후에는 팀장이 해당 브랜치를 삭제하고, 다음 이슈를 정했을 때만 새 브랜치를 만든다.
 
 ## 상태 규칙
 
