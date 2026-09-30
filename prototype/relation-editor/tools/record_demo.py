@@ -10,6 +10,9 @@ python tools/record_demo.py --fast     # 기다리는 시간을 줄여 빨리 (�
 - 2부의 AutoCAD 출력 그림은 같은 계획안으로 미리 뽑아 둔 scenario/b*.png 를 쓴다(AutoCAD 실행은 녹화에 넣지 않음).
 - 단계마다 상태를 확인하고, 어긋나면 멈춘다.
 
+- out/video_intro/autocad_intro.mp4 (python tools/record_autocad_intro.py 로 찍은, AutoCAD에서 가린 실무 도면을 여는 장면)가
+  있으면 제목 다음에 끼운다. --no-intro 로 끌 수 있다.
+
 먼저: bash tools/setup_from_drawings.sh, python tools/rehearse.py, python tools/show_pdf_apply.py --no-open, python tools/make_scenario_images.py
 필요: pip install playwright (Edge 설치본을 쓴다), ffmpeg(또는 imageio-ffmpeg)
 """
@@ -464,6 +467,40 @@ def part3(r):
     r.caption("")
 
 
+INTRO = ROOT / "out" / "video_intro"
+INTRO_CAPTIONS = [            # (시작 표시, 끝 표시, 자막) — 표시는 tools/record_autocad_intro.py 가 남긴 marks.json 의 이름
+    (None, "open", "실무 도면을 캐드에서 엽니다 — AutoCAD 2024"),
+    ("open", "plan", "근린생활시설 1층 평면도 (설계사무소·대지 위치 정보는 가린 복사본)"),
+    ("plan", "detail", "기둥, 벽, 문·창호, 치수가 모두 선과 글자로만 그려져 있습니다"),
+    ("detail", "back", "창 하나를 바꾸려면 기호, 벽선, 치수를 하나씩 손으로 고쳐야 합니다"),
+    ("back", None, "이 도면을 읽어서 '관계도'로 바꿉니다"),
+]
+
+
+def compose_intro(ff):
+    """AutoCAD 화면 녹화(out/video_intro/autocad_intro.mp4)를 영상 크기에 맞추고 아래 띠에 자막을 넣는다."""
+    from PIL import Image, ImageDraw, ImageFont
+    src, mk = INTRO / "autocad_intro.mp4", INTRO / "marks.json"
+    if not (src.exists() and mk.exists()):
+        return None
+    marks = json.loads(mk.read_text(encoding="utf-8"))
+    vw, vh = marks["size"]
+    sh = int(W * vh / vw) // 2 * 2                      # 너비에 맞춘 높이
+    band = H - sh
+    font = ImageFont.truetype("C:/Windows/Fonts/malgunbd.ttf", 30)
+    args, filt, last = [ff, "-y", "-loglevel", "error", "-i", str(src)], [f"[0:v]scale={W}:{sh},pad={W}:{H}:0:0:color=0x0f172a,fps=25[b0]"], "b0"
+    for i, (a, b, text) in enumerate(INTRO_CAPTIONS):
+        im = Image.new("RGB", (W, band), (15, 23, 42)); d = ImageDraw.Draw(im)
+        tw = d.textlength(text, font=font); d.text(((W - tw) / 2, (band - 40) / 2), text, font=font, fill=(255, 255, 255))
+        png = INTRO / f"cap{i}.png"; im.save(png)
+        t0, t1 = (marks[a] if a else 0), (marks[b] if b else marks["end"] + 1)
+        args += ["-i", str(png)]
+        filt.append(f"[{last}][{i + 1}:v]overlay=0:{sh}:enable='between(t,{t0},{t1})'[b{i + 1}]"); last = f"b{i + 1}"
+    out = INTRO / "intro_1600.mp4"
+    subprocess.run(args + ["-filter_complex", ";".join(filt), "-map", f"[{last}]", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-r", "25", str(out)], check=True)
+    return out
+
+
 def main():
     if OUT.exists():
         shutil.rmtree(OUT, ignore_errors=True)
@@ -475,12 +512,15 @@ def main():
         ctx = br.new_context(viewport={"width": W, "height": H}, record_video_dir=str(raw), record_video_size={"width": W, "height": H}, accept_downloads=True, locale="ko-KR")
         ctx.add_init_script(CURSOR_JS)
         page = ctx.new_page()
+        t_start = time.time()
         page.on("dialog", lambda d: d.accept())
         r = Rec(page)
-        err = None
+        err, cut = None, None
         try:
             r.title("관계도로 도면을 고치고, 관계도로 도면을 그린다", ["도면의 선을 하나씩 고치는 대신 '기둥·벽·보·문·창호가 서로 어떻게 붙어 있는가'를 고치면",
                                                    "선과 치수와 설비 위치는 따라옵니다", "~이 영상의 조작은 모두 실제 편집기에서 실제 마우스·키보드 이벤트로 진행한 것입니다"], sec=6)
+            # AutoCAD 화면 녹화를 끼울 자리: 검은 화면을 잠깐 두고 그 가운데를 자른다
+            r.slide("", cls="dark"); time.sleep(0.9); cut = time.time() - t_start; time.sleep(0.9)
             for part in PARTS:
                 print(f"== {part}부")
                 {"1": part1, "2": part2, "3": part3}[part](r)
@@ -507,7 +547,15 @@ def main():
         except Exception:
             ff = None
     if ff:
-        subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(webm), "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p", "-r", "25", "-movflags", "+faststart", str(mp4)], check=True)
+        enc = ["-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p", "-r", "25", "-movflags", "+faststart"]
+        intro = compose_intro(ff) if (cut and "1" in PARTS and "--no-intro" not in sys.argv) else None
+        if intro:                                   # 제목 → AutoCAD에서 도면 열기 → 나머지
+            fc = (f"[0:v]trim=0:{cut:.2f},setpts=PTS-STARTPTS,fps=25,scale={W}:{H}[a];[1:v]setpts=PTS-STARTPTS,fps=25[b];"
+                  f"[0:v]trim=start={cut:.2f},setpts=PTS-STARTPTS,fps=25,scale={W}:{H}[c];[a][b][c]concat=n=3:v=1:a=0[v]")
+            subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(webm), "-i", str(intro), "-filter_complex", fc, "-map", "[v]"] + enc + [str(mp4)], check=True)
+            print("AutoCAD 도입부를 끼움:", intro.name, f"(자른 자리 {cut:.1f}초)")
+        else:
+            subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(webm)] + enc + [str(mp4)], check=True)
         print("saved", mp4, f"({mp4.stat().st_size / 1e6:.1f} MB)")
     print("saved", webm, f"| 녹화 {time.time() - t0:.0f}초")
     if err:
