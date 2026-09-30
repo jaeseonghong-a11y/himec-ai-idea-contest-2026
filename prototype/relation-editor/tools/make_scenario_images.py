@@ -38,7 +38,12 @@ REH = ROOT / "out" / "rehearsal"
 (DST / "rehearsal").mkdir(exist_ok=True)
 n = 0
 for src in sorted(REH.glob("*_step*.png")):
-    shutil.copyfile(src, DST / "rehearsal" / src.name.replace("A12M_", "a_").replace("NEW1_", "b_")); n += 1
+    shutil.copyfile(src, DST / "rehearsal" / src.name.replace("A12M_", "a_").replace("NEW1_", "b_").replace("P3_", "c_")); n += 1
+pa = ROOT / "out" / "real" / "pdf_apply_before_after.png"
+if pa.exists():
+    shutil.copyfile(pa, DST / "c1_pdf_before_after.png"); print("c1_pdf_before_after", pa.stat().st_size // 1024, "KB")
+else:
+    print("c1_pdf_before_after 없음: python tools/show_pdf_apply.py --no-open 을 먼저 실행")
 print(f"리허설 화면 {n}장" if n else "리허설 화면 없음: python tools/rehearse.py 를 먼저 실행")
 pdf = next((q for q in (ROOT / "out" / "real" / "NEW1_autocad.pdf", ROOT / "out" / "real" / "NEW1T_autocad.pdf") if q.exists()), ROOT / "out" / "real" / "NEW1_autocad.pdf")
 if pdf.exists():

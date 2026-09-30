@@ -1626,7 +1626,7 @@ if (typeof module !== "undefined") module.exports = { offsetToGrid, offsetColumn
   $("btnFit").onclick = fit;
   $("btnInstr").onclick = () => $("fileInstr").click();
   $("fileInstr").onchange = ev => { const f = ev.target.files[0]; if (!f) return; const rd = new FileReader();
-    rd.onload = () => { try { const j = JSON.parse(rd.result), items = Array.isArray(j) ? j : (j.items || []); commit(() => { instr = loadInstructions(G, items); }); render(); } catch (e) { alert("지시 파일을 읽지 못했습니다: " + e.message); } };
+    rd.onload = () => { try { const j = JSON.parse(rd.result), items = Array.isArray(j) ? j : (j.items || []); commit(() => { instr = loadInstructions(G, items); }); render(); $("instrPanel").scrollIntoView({ block: "start" }); } catch (e) { alert("지시 파일을 읽지 못했습니다: " + e.message); } };
     rd.readAsText(f, "utf-8"); ev.target.value = ""; };
   $("btnExport").onclick = () => { const out = exportChanges(ORIG, G, $("reviewer").value.trim()); if (!out.length) { alert("변경 사항이 없습니다."); return; }
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: "application/json" })); a.download = `changes_${G.sheet}.json`; a.click(); URL.revokeObjectURL(a.href); };
@@ -1854,7 +1854,21 @@ if (typeof module !== "undefined") module.exports = { offsetToGrid, offsetColumn
     const alongPt = (e, t) => { const A = N()[e.from].xy, B = N()[e.to].xy; return [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t]; };
     const openOn = (mode, e, t) => { setMode(mode); const el = q(`[data-kind="cand-wall"][data-id="${CSS.escape(e.id)}"]`); if (!el) throw new Error(`벽 ${e.id} 후보 없음`); const p = alongPt(e, t); click(el, toClient(p[0], p[1])); };
     const S = [];
-    if (ORIG.source !== "blank") {      // ===== 1부: 있는 도면을 고친다 =====
+    if (ORIG.source !== "blank" && location.hash.includes("part3")) {      // ===== 3부: 플러그인 PDF의 변경 지시로 고친다 =====
+      // samples/instructions/pdf-test.dxf-변경일람-20260930-190327.pdf 를 tools/pdf_instructions.py 로 변환한 것과 같은 내용
+      const PDF = [
+        { no: 1, target: "C1 #8E", tag: "C1", handle: "8E", change: "Y +300 mm", floor: "", status_text: "대상 확정", status: "confirmed", action: "move", axis: "Y", delta: 300 },
+        { no: 2, target: "기둥", tag: "기둥", handle: null, change: "Y -200 mm", floor: "3층?", status_text: "확인 필요", status: "needs_review", action: "move", axis: "Y", delta: -200 }];
+      const col = () => G.nodes.find(n => n.type === "column" && n.grid[0] === "X6" && n.grid[1] === "Y2");
+      S.push(["3-1. 지시 불러오기: 플러그인 PDF에서 변환한 JSON (C1 #8E Y +300 / 기둥 Y -200 확인 필요)", () => { sel = null; commit(() => { instr = loadInstructions(G, PDF); }); render(); $("instrPanel").scrollIntoView({ block: "start" }); },
+        () => $("instrPanel").querySelectorAll("li").length === 2 && instr[0].ask && instr[0].note.includes("#8E") && !instr[1].applied]);
+      S.push(["3-2. 기둥 X6-Y2를 클릭하고 [1]의 '고른 줄에 적용'", () => { const y0 = G.grids.Y2.coord; pick("column", col().id); $("instrPanel").querySelector('.instrApply[data-i="0"]:not([data-col])').click(); S.y0 = y0; },
+        () => G.grids.Y2.coord === S.y0 + 300 && instr[0].applied]);
+      S.push(["3-3. 되돌리고, 핸들이 이 도면 기둥의 것인 지시 파일 불러오기 (플러그인이 이 도면에서 냈다면 나올 형식)", () => { $("btnUndo").click(); $("btnUndo").click(); sel = null; const h = ORIG.nodes.find(n => n.type === "column" && n.grid[0] === "X6" && n.grid[1] === "Y2").handle;
+          const items = PDF.map(it => it.handle ? { ...it, target: `C1 #${h}`, handle: h } : it); const y0 = G.grids.Y2.coord; S.y1 = y0; commit(() => { instr = loadInstructions(G, items); }); render(); },
+        () => instr[0].applied && !instr[0].ask && G.grids.Y2.coord === S.y1 + 300 && instr[0].note.includes("X6-Y2")]);
+      S.push(["3-4. 검토자 이름을 쓰고 변경 내보내기", () => { $("reviewer").value = "리허설"; sel = null; render(); }, () => exportChanges(ORIG, G, "리허설").some(c => c.action === "move")]);
+    } else if (ORIG.source !== "blank") {      // ===== 1부: 있는 도면을 고친다 =====
       S.push(["0. 도면을 읽은 관계도", () => { sel = null; render(); }, () => Object.keys(G.grids).length >= 10]);
       S.push(["1. X6 그리드를 클릭하고 이동량 500 적용", () => { pick("grid", "X6"); set("inDelta", 500); $("btnApplyDelta").click(); }, () => G.grids.X6.coord === ORIG.grids.X6.coord + 500]);
       S.push(["2-1. 창호 W2를 클릭하고 타입 WT3(900)으로", () => { pick("opening", "W2"); set("inOT", "WT3"); }, () => G.openings.find(o => o.id === "W2").otype === "WT3"]);

@@ -30,7 +30,7 @@ def main():
         for x in XS:
             n += 1
             msp.add_blockref("COLUMN", (x, y), dxfattribs={"layer": "0"})
-            msp.add_text(f"COLUMN {n}", dxfattribs={"height": 120, "insert": (x - 150, y - 400)})
+            msp.add_text(f"COLUMN {n}", dxfattribs={"height": 200, "insert": (x - 150, y - 400)})
     for i, x in enumerate(XS, start=1):            # 그리드선과 기호
         msp.add_line((x, -1500), (x, 8000), dxfattribs={"layer": "GRID", "linetype": "CENTER"})
         msp.add_circle((x, 8000 + 400), 400, dxfattribs={"layer": "GRID"})
@@ -40,9 +40,9 @@ def main():
         msp.add_circle((-2500 - 400, y), 400, dxfattribs={"layer": "GRID"})
         msp.add_text(f"Y{j}", dxfattribs={"height": 300, "insert": (-2500 - 600, y - 150), "layer": "GRID"})
     for a, b in zip(XS, XS[1:]):                   # 치수
-        msp.add_linear_dim(base=(0, 6500), p1=(a, 5000), p2=(b, 5000), dxfattribs={"layer": "DIM"}).render()
-    msp.add_linear_dim(base=(0, 7300), p1=(XS[0], 5000), p2=(XS[-1], 5000), dxfattribs={"layer": "DIM"}).render()
-    msp.add_linear_dim(base=(-1200, 0), p1=(0, 0), p2=(0, 5000), angle=90, dxfattribs={"layer": "DIM"}).render()
+        msp.add_linear_dim(base=(0, 6500), p1=(a, 5000), p2=(b, 5000), dimstyle="EZDXF", override={"dimtxsty": "Standard", "dimtxt": 250, "dimasz": 150, "dimexe": 150, "dimexo": 100, "dimgap": 60, "dimlfac": 1, "dimdec": 0}, dxfattribs={"layer": "DIM"}).render()
+    msp.add_linear_dim(base=(0, 7300), p1=(XS[0], 5000), p2=(XS[-1], 5000), dimstyle="EZDXF", override={"dimtxsty": "Standard", "dimtxt": 250, "dimasz": 150, "dimexe": 150, "dimexo": 100, "dimgap": 60, "dimlfac": 1, "dimdec": 0}, dxfattribs={"layer": "DIM"}).render()
+    msp.add_linear_dim(base=(-1200, 0), p1=(0, 0), p2=(0, 5000), angle=90, dimstyle="EZDXF", override={"dimtxsty": "Standard", "dimtxt": 250, "dimasz": 150, "dimexe": 150, "dimexo": 100, "dimgap": 60, "dimlfac": 1, "dimdec": 0}, dxfattribs={"layer": "DIM"}).render()
     OUT.parent.mkdir(parents=True, exist_ok=True)
     d.saveas(OUT)
     r = ezdxf.readfile(OUT)
