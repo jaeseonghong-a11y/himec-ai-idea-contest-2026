@@ -210,6 +210,66 @@ public sealed class PluginCommands : IExtensionApplication
         _panel?.SetStatus(reason);
     }
 
+    [CommandMethod("HIMEC_PDF_CLEAR")]
+    public void ClearPdfMarkup()
+    {
+        var doc = AcadApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        try
+        {
+            var erased = PdfExporter.ClearMarkup(doc);
+            doc.Editor.WriteMessage($"\nHIMEC: 주석·일람표 객체 {erased}개를 지웠습니다.\n");
+            _panel?.SetStatus($"주석·일람표 {erased}개를 지웠습니다. 도면은 저장하지 않았습니다.");
+        }
+        catch (System.Exception ex)
+        {
+            doc.Editor.WriteMessage($"\nHIMEC: 표식 지우기 실패: {ex.Message}\n");
+            _panel?.SetStatus("표식 지우기 실패: " + ex.Message);
+        }
+    }
+
+    [CommandMethod("HIMEC_PDF")]
+    public void ExportPdf()
+    {
+        var doc = AcadApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        if (_panel is null)
+        {
+            doc.Editor.WriteMessage("\nHIMEC: 먼저 HIMEC 명령으로 팔레트를 여세요.\n");
+            return;
+        }
+        var plan = _panel.BuildPdfPlan(doc.Name, out var reason);
+        if (plan is null) { _panel.SetStatus(reason); return; }
+        try
+        {
+            var folder = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Himec", "Exports");
+            Directory.CreateDirectory(folder);
+            var stem = Path.GetFileNameWithoutExtension(doc.Name);
+            var path = Path.Combine(folder, $"{stem}-변경일람-{DateTime.Now:yyyyMMdd-HHmmss}.pdf");
+            PdfExporter.Export(doc, plan, path, _panel.KeepMarkup);
+            doc.Editor.WriteMessage($"\nHIMEC: PDF를 저장했습니다. {path}\n");
+            // Written after the export: the grid names are read from the sheet while it draws.
+            // The relation editor opens this file with its instruction loader as is.
+            var json = InstructionExport.PathFor(path);
+            File.WriteAllText(json, InstructionExport.Serialize(
+                InstructionExport.Build(plan, path, DateTimeOffset.Now)));
+            doc.Editor.WriteMessage($"HIMEC: 관계도용 지시 파일을 저장했습니다. {json}\n");
+            var kept = _panel.KeepMarkup
+                ? "주석·일람표를 도면에 남겼습니다(저장 안 함). 지우려면 표식 지우기."
+                : "도면은 그대로 두었습니다.";
+            var layers = PdfExporter.LastDeviceUsed.StartsWith("HIMEC", StringComparison.Ordinal)
+                ? "레이어 포함"
+                : "레이어 미포함(기본 드라이버)";
+            _panel.SetStatus($"PDF·지시 JSON 저장 완료 — 확정 {plan.MatchedCount}건, 확인 필요 {plan.QuestionCount}건. {layers}. {kept}");
+        }
+        catch (System.Exception ex)
+        {
+            doc.Editor.WriteMessage($"\nHIMEC: PDF 내보내기 실패: {ex.Message}\n");
+            _panel.SetStatus("PDF 내보내기 실패: " + ex.Message);
+        }
+    }
+
     [CommandMethod("HIMEC_APPLY")]
     public void ApplyReviewedMove()
     {
@@ -219,7 +279,8 @@ public sealed class PluginCommands : IExtensionApplication
             change.Reviewer is null || change.ReviewedAt is null ||
             change.Action != "move" || change.TargetHandle is null ||
             change.TargetDrawing != doc.Name || SelectedObjectId.IsNull ||
-            !double.IsFinite(change.DxMm) || !double.IsFinite(change.DyMm) ||
+            double.IsNaN(change.DxMm) || double.IsInfinity(change.DxMm) ||
+            double.IsNaN(change.DyMm) || double.IsInfinity(change.DyMm) ||
             (change.DxMm == 0 && change.DyMm == 0))
         {
             doc?.Editor.WriteMessage("\nHIMEC: 승인·도면·대상 조건이 맞지 않아 실행하지 않았습니다.\n");

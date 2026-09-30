@@ -29,7 +29,9 @@ internal static class RecordingTagStore
         try
         {
             File.WriteAllText(temporary, JsonSerializer.Serialize(session, JsonOptions));
-            File.Move(temporary, path, true);
+            // File.Move(overwrite) is .NET Core only; File.Replace works on both targets.
+            if (File.Exists(path)) File.Replace(temporary, path, null);
+            else File.Move(temporary, path);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
@@ -37,7 +39,10 @@ internal static class RecordingTagStore
     private static string SessionFile(string recordingPath)
     {
         var normalized = Path.GetFullPath(recordingPath).ToUpperInvariant();
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)));
+        // SHA256.HashData and Convert.ToHexString are .NET 5+; these produce the
+        // same uppercase digest on both targets, so existing session files still resolve.
+        using var sha = SHA256.Create();
+        var hash = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(normalized))).Replace("-", string.Empty);
         return Path.Combine(Root, hash + ".tags.json");
     }
 }

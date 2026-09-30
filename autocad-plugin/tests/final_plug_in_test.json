@@ -1,0 +1,48 @@
+{
+  "schema": "himec.change-instructions/v1",
+  "source_pdf": "pdf-test.dxf-변경일람-20260930-211028.pdf",
+  "drawing": "pdf-test.dxf.dwg",
+  "units": "mm",
+  "exported_at": "2026-09-30T21:10:32+09:00",
+  "items": [
+    {
+      "no": 1,
+      "change_id": "b75a740f98d04d83aa312cbefc1fe648",
+      "target": "C1 #8E",
+      "tag": "C1",
+      "handle": "8E",
+      "grid": "X1-Y2",
+      "action": "move",
+      "axis": "Y",
+      "delta": 300,
+      "dx": 0,
+      "dy": 300,
+      "change": "Y +300 mm",
+      "floor": "",
+      "status": "confirmed",
+      "status_text": "대상 확정",
+      "question": null
+    },
+    {
+      "no": 2,
+      "change_id": "5950fcf7b3f24f61b930ab860bcaa636",
+      "target": "기둥",
+      "tag": "기둥",
+      "handle": null,
+      "grid": null,
+      "action": "move",
+      "axis": "Y",
+      "delta": -200,
+      "dx": 0,
+      "dy": -200,
+      "change": "Y -200 mm",
+      "floor": "3층?",
+      "status": "needs_review",
+      "status_text": "확인 필요",
+      "question": "\"기둥\"은 일반 명칭이라 대상을 확정할 수 없습니다. Y -200 mm의 대상을 도면에서 선택해 주세요. (앞 대화 기준 3층으로 보입니다 — 확인 필요)"
+    }
+  ],
+  "notes": [
+    "[2] \"기둥\"은 일반 명칭이라 대상을 확정할 수 없습니다. Y -200 mm의 대상을 도면에서 선택해 주세요. (앞 대화 기준 3층으로 보입니다 — 확인 필요)"
+  ]
+}
