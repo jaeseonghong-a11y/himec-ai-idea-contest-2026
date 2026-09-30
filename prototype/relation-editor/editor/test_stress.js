@@ -141,5 +141,15 @@ function save(G, name, label) {
   save(G, "S7", "층고 2400/6000 계단 계산, 대지 밖 승강기");
 }
 
+// ---------- S8: 층고 7000 (중간 계단참), 그리드를 요소와 함께 삭제한 계획안 ----------
+{
+  const G = fresh(); C.newProjectDemo(G); G.project.floor_height = 7000; C.recompute(G);
+  const st = G.cores.find(c => c.kind === "stair");
+  if (!st.rect.calc.mid_landing) note("S8", "이상", "층고 7000인데 중간 계단참이 없음");
+  const X3 = gid(G, "x", 15000); C.deleteGrid(G, X3, "with"); C.recompute(G);
+  const w = save(G, "S8", `층고 7000 계단(길이 ${st.rect.d}), X3을 요소와 함께 삭제(12000 스팬)`);
+  if (!w.some(x => x.includes("스팬") && x.includes("12000"))) note("S8", "누락", "12000 스팬 보에 경고 없음");
+  if (!w.some(x => x.includes("가로지름"))) note("S8", "누락", "7720 길이 계단이 6000 스팬을 넘어 외벽을 뚫는데 경고 없음");
+}
 fs.writeFileSync(path.join(outDir, "findings_js.json"), JSON.stringify(findings, null, 1));
 console.log(`\n편집기 쪽 발견 ${findings.length}건. 이어서: python tools/stress_run.py`);

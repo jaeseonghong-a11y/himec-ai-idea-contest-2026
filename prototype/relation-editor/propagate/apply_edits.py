@@ -534,8 +534,10 @@ def do_add_core(doc, ch, log):
     else:
         k = p["calc"]
         vert, sgn = p["dir"] in ("N", "S"), (1 if p["dir"] in ("N", "E") else -1)
+        mid = k.get("mid_landing") or {}
+        run_l = k["run"] + mid.get("depth", 0)          # 중간 계단참(3 m마다)이 있으면 그만큼 길다
         for i in range(k["treads_per_flight"] + 1):
-            off = lead + i * k["tread"]
+            off = lead + i * k["tread"] + (mid.get("depth", 0) if mid and i >= mid.get("after", 10 ** 9) else 0)
             if vert:
                 y = (r["y0"] if sgn > 0 else r["y1"]) + sgn * off
                 msp.add_line((r["x0"], y), (r["x1"], y), dxfattribs=at)
@@ -545,10 +547,10 @@ def do_add_core(doc, ch, log):
             n += 1
         if vert:   # 두 계단 사이 틈과 올라가는 방향
             xm, y0 = (r["x0"] + r["x1"]) / 2, (r["y0"] if sgn > 0 else r["y1"]) + sgn * lead
-            msp.add_lwpolyline([(xm - 50, y0), (xm + 50, y0), (xm + 50, y0 + sgn * k["run"]), (xm - 50, y0 + sgn * k["run"])], close=True, dxfattribs=at)
+            msp.add_lwpolyline([(xm - 50, y0), (xm + 50, y0), (xm + 50, y0 + sgn * run_l), (xm - 50, y0 + sgn * run_l)], close=True, dxfattribs=at)
         else:
             ym, x0 = (r["y0"] + r["y1"]) / 2, (r["x0"] if sgn > 0 else r["x1"]) + sgn * lead
-            msp.add_lwpolyline([(x0, ym - 50), (x0, ym + 50), (x0 + sgn * k["run"], ym + 50), (x0 + sgn * k["run"], ym - 50)], close=True, dxfattribs=at)
+            msp.add_lwpolyline([(x0, ym - 50), (x0, ym + 50), (x0 + sgn * run_l, ym + 50), (x0 + sgn * run_l, ym - 50)], close=True, dxfattribs=at)
         n += 1
         note = f'층고 {k["floor_height"]}, {k["risers"]}단, 단높이 {k["riser"]}, 단너비 {k["tread"]}'
     # 둘러싼 벽 (관계도의 그리드 벽과 구분되도록 따로 둔 레이어)
@@ -556,9 +558,10 @@ def do_add_core(doc, ch, log):
     WL = std.layer_of(prof, "core_wall")
     ensure_layer(doc, WL, prof["roles"]["core_wall"]["color"])
     merged = getattr(doc, "_himec_core_lines", {}).pop(ch["target"], None) if getattr(doc, "_himec_union", False) else None
-    if merged is None:
-        for w in r.get("walls", []):
-            msp.add_lwpolyline([(w["x0"], w["y0"]), (w["x1"], w["y0"]), (w["x1"], w["y1"]), (w["x0"], w["y1"])], close=True, dxfattribs={"layer": WL})
+    if merged is None and r.get("walls"):        # 기존 도면: 이 코어의 벽끼리만 합쳐 외곽선으로 그린다 (건물 벽선은 건드리지 않음)
+        segs = [wl.wall_from_box(w["x0"], w["y0"], w["x1"], w["y1"], WL, ch["target"], r.get("wall_lw")) for w in r["walls"]]
+        for x1, y1, x2, y2, layer, _o, lw in wl.outline(segs, wl.column_rects(doc)):
+            msp.add_line((x1, y1), (x2, y2), dxfattribs={"layer": layer, **({"lineweight": lw} if lw else {})})
             n += 1
     g = r.get("gap")
     if g and p["kind"] == "elevator":      # 승강기 문: 벽 두께 가운데에 문짝 두 장

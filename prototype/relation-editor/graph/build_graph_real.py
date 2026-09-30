@@ -155,7 +155,7 @@ def attach_to_edge(pt, edges, nodes, max_d):
     return best
 
 
-def wall_gap(msp, horiz, wall_c, center, zone=450):
+def wall_gap(msp, horiz, wall_c, center, zone=450, column_faces=()):
     """개구부 중심을 끼고 벽선이 끊긴 구간의 폭을 레이어 계열별로 잰다. {계열: 폭}"""
     res = {}
     for layers in (("COL",), ("WAL",), ("마감선", "단열재")):
@@ -171,19 +171,23 @@ def wall_gap(msp, horiz, wall_c, center, zone=450):
             left = [hi for lo, hi in ivs if hi <= center + 1]
             right = [lo for lo, hi in ivs if lo >= center - 1]
             if left and right:
-                found.append(round(min(right) - max(left)))
+                found.append((round(min(right) - max(left)), round(max(left)), round(min(right))))
         if found:
             best = {}
             for f in found:
-                best[f] = best.get(f, 0) + 1
-            res[layers[0]] = max(best.items(), key=lambda kv: kv[1])[0]
+                best[f[0]] = best.get(f[0], 0) + 1
+            w = max(best.items(), key=lambda kv: kv[1])[0]
+            ends = next(f[1:] for f in found if f[0] == w)
+            if column_faces and layers[0] == "COL" and all(any(abs(v - c) <= 5 for c in column_faces) for v in ends):
+                continue          # 양쪽이 기둥 면이면 벽체가 아니라 기둥 사이다(새로 그린 도면)
+            res[layers[0]] = w
     return res
 
 
-def nominal_width(msp, o, horiz, wall_c):
+def nominal_width(msp, o, horiz, wall_c, column_faces=()):
     """호칭 치수: 벽체(COL) → 벽 마감(WAL) → 마감선 순으로 끊긴 폭을 쓰고, 못 재면 기호 폭에서 추정."""
     c = o["xy"][0] if horiz else o["xy"][1]
-    gap = wall_gap(msp, horiz, wall_c, c)
+    gap = wall_gap(msp, horiz, wall_c, c, column_faces=column_faces)
     for k, label in (("COL", "벽체 개구부"), ("WAL", "벽 마감 개구부")):
         g = gap.get(k)
         if g and o["width"] - 30 <= g <= o["width"] + 300:
@@ -441,6 +445,9 @@ def build(dxf_path: Path, sheet: str):
             columns[(xi, yj)] = {"id": f"C@{xi}-{yj}", "type": "column", "grid": [xi, yj], "xy": [gx[xi]["coord"], gy[yj]["coord"]],
                                  "spec": f'{int(c["w"])}x{int(c["h"])}', "handle": c["handle"], "layer": "COL"}
 
+    col_faces = set()
+    for c in rect_polys(msp, "COL"):      # 기둥 면의 좌표(개구부 폭을 잴 때 기둥 사이를 벽체 개구부로 보지 않기 위해)
+        col_faces |= {round(c["cx"] - c["w"] / 2), round(c["cx"] + c["w"] / 2), round(c["cy"] - c["h"] / 2), round(c["cy"] + c["h"] / 2)}
     wall_segs = segments_of(msp, WALL_LAYERS)
     win_segs = segments_of(msp, WIN_LAYERS)
     wal_only = segments_of(msp, ("WAL",))
@@ -578,7 +585,7 @@ def build(dxf_path: Path, sheet: str):
         if o.get("band"):
             o["nominal"], o["nominal_src"] = o["width"], "문 띠 길이"
         else:
-            o["nominal"], o["nominal_src"] = nominal_width(msp, o, horiz, grids[e["along"]]["coord"])
+            o["nominal"], o["nominal_src"] = nominal_width(msp, o, horiz, grids[e["along"]]["coord"], col_faces)
 
     # 치수
     dims = []

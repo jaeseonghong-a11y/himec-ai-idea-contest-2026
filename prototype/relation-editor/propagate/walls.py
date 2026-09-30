@@ -113,7 +113,7 @@ def outline(walls, columns):
                 m = Point((p[0] + q[0]) / 2, (p[1] + q[1]) / 2)
                 if any(b.distance(m) < 0.01 for b in col_bounds):      # 기둥과 닿은 변은 기둥 외곽선이 대신한다
                     continue
-                k = min(range(len(walls)), key=lambda i: strips[i].exterior.distance(m))
+                k = min(range(len(walls)), key=lambda i: (round(strips[i].exterior.distance(m), 1), walls[i]["owner"] is not None))      # 같은 거리면 건물 벽(코어 벽보다) 우선
                 w = walls[k]
                 out.append((p[0], p[1], q[0], q[1], w["layer"], w["owner"], w.get("lw")))
     return _merge(out)

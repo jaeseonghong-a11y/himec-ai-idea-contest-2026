@@ -155,6 +155,22 @@ G = fresh(); C.newProjectDemo(G);
   const ex = C.exportChanges(ORIG, G, "김기준");
   ok("내보내기: 사선 벽·보와 정렬 치수", ex.some(c => c.action === "add_wall" && c.target === id && c.params.from_xy[0] !== c.params.to_xy[0] && c.params.from_xy[1] !== c.params.to_xy[1]) && ex.some(c => c.action === "add_beam" && c.target === id) && ex.find(c => c.action === "add_dims").params.items.some(i => i.orient === "A" && i.value === 8485)); }
 
+// 요소가 있는 그리드 삭제: 함께 지우기 / 이웃으로 합치기
+G = fresh(); C.newProjectDemo(G);
+{ const gid = (ax, v) => Object.values(G.grids).find(x => x.axis === ax && x.coord === v).id, X2 = gid("x", 9000), n0 = G.nodes.filter(n => n.type === "column").length, w0 = G.edges.filter(e => e.wall).length;
+  ok("요소가 있는 그리드는 그냥은 못 지움", C.deleteGrid(G, X2) === false && !!G.grids[X2]);
+  ok("요소와 함께 삭제: 기둥 3개가 빠지고, 가로지르던 벽·보는 이어 붙음", C.deleteGrid(G, X2, "with") && !G.grids[X2] && G.nodes.filter(n => n.type === "column").length === n0 - 3 && G.edges.some(e => e.id.includes("X1-Y1") && e.id.includes("X3-Y1") && e.wall && e.beam) && G.edges.filter(e => e.wall).length === w0 - 2, `(기둥 ${G.nodes.filter(n => n.type === "column").length}, 구간 ${G.edges.length})`);
+  ok("이어 붙은 벽 위의 창호는 살아 있고 위치 치수도 나옴", G.openings.some(o => o.id === "W1") && G.dims2.some(d => d.kind === "opening"));
+  const G2 = fresh(); C.newProjectDemo(G2); const X3 = gid("x", 15000), X4 = gid("x", 21000);
+  const ok2 = C.deleteGrid(G2, X4, X3);
+  ok("이웃으로 합치기: X4의 요소가 X3으로 옮겨지고 X3~X4 사이 구간은 사라짐", ok2 && !G2.grids[X4] && G2.nodes.filter(n => n.type === "column").length === 9 && G2.edges.every(e => e.from !== e.to) && G2.openings.every(o => G2.edges.some(e => e.id === o.on_edge)) && Object.values(G2.grids).filter(x => x.axis === "x").length === 3, `(기둥 ${G2.nodes.filter(n => n.type === "column").length}, 구간 ${G2.edges.length}, 문·창호 ${G2.openings.length})`);
+  const ex4 = C.exportChanges(ORIG, G2, "시험"); ok("합친 뒤에도 내보내기가 됨", ex4.length > 0 && ex4.filter(c => c.action === "add_grid").length === 6); }
+
+// 긴 층고: 3 m 마다 계단참
+{ const k = C.stairCalc(7000, 1200);
+  ok("층고 7000이면 한 번에 오르는 높이가 3 m를 넘어 중간 계단참이 생김", !!k.mid_landing && k.mid_landing.depth === 1200 && k.length === k.run + 1200 + 1200 && k.riser <= 180, JSON.stringify(k.mid_landing));
+  ok("층고 3400은 중간 계단참 없음", !C.stairCalc(3400, 1200).mid_landing); }
+
 // 시연 시나리오의 끝 상태(벽 두께, 코어 벽 두께, 거더와 보, 사선 모서리)를 도면으로 그려 확인한다
   G = fresh(); const show = C.newProjectShowcase(G);
   console.log("\n시연 시나리오(새 프로젝트):", show.join(" / "));
