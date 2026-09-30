@@ -399,6 +399,16 @@ def do_resize(doc, ch, log):
     return {"resized": n}
 
 
+def opening_blocked(p, s, e):
+    """그릴 수 없는 개구부인지: 벽의 기둥 면 사이를 벗어나거나 다른 개구부와 겹치면 그리지 않는다(편집기가 이미 경고한 상태)."""
+    clear = p.get("clear")
+    if clear and (s < clear[0] - 1 or e > clear[1] + 1):
+        return f"폭 {e - s:.0f}({s:.0f}~{e:.0f})이 벽의 기둥 면 사이({clear[0]:.0f}~{clear[1]:.0f})를 벗어남"
+    if p.get("overlaps"):
+        return f'다른 개구부 {", ".join(p["overlaps"])}와 겹침'
+    return None
+
+
 def do_edit_opening(doc, ch, log):
     p, msp = ch["params"], doc.modelspace()
     ents = entities_of(doc, p["handles"])
@@ -406,6 +416,12 @@ def do_edit_opening(doc, ch, log):
         log.append(f'{ch["id"]} {ch["target"]} 수정: 도면 객체를 찾지 못함'); return {"ok": False}
     horiz, hs = p["horiz"], set(p["handles"])
     wall_c = p["center_to"][1] if horiz else p["center_to"][0]
+    c_to = p["center_to"][0] if horiz else p["center_to"][1]
+    w_to = p.get("width_to") or p.get("width_from") or 0
+    why = opening_blocked(p, c_to - w_to / 2, c_to + w_to / 2)
+    if why:
+        log.append(f'{ch["id"]} {ch["target"]} 수정: {why}. 원래 자리에 그대로 둠. 편집기 경고대로 고친 뒤 다시 반영해야 함')
+        return {"ok": False, "skipped": why}
     s, e = along_extent(ents, horiz)
     ext = bb.extents(ents, fast=True)
     q_old = ((ext.extmin.y + ext.extmax.y) / 2 if horiz else (ext.extmin.x + ext.extmax.x) / 2) - wall_c
@@ -792,6 +808,11 @@ def do_add_opening(doc, ch, log):
     c = p["center"][0] if horiz else p["center"][1]
     wall_c = p["center"][1] if horiz else p["center"][0]
     s, e = c - p["width"] / 2, c + p["width"] / 2
+    # 벽이 개구부를 담을 수 있는지: 그 자리의 벽선이 개구부 양쪽으로 50 이상 남아야 한다 (편집기가 이미 경고한 경우)
+    why = opening_blocked(p, s, e)
+    if why:
+        log.append(f'{ch["id"]} {"창호" if p["type"] == "window" else "문"} {ch["target"]}: {why}. 편집기 경고대로 고친 뒤 다시 반영해야 함')
+        return {"added": 0, "skipped": why}
     offsets, st = cut_range(doc, horiz, wall_c, s, e)
     qlo, qhi = (wall_c + min(offsets), wall_c + max(offsets)) if len(offsets) >= 2 and max(offsets) - min(offsets) >= 50 else (wall_c - p.get("thick", 200) / 2, wall_c + p.get("thick", 200) / 2)
     ensure_layer(doc, "WAL", 3)

@@ -252,10 +252,26 @@ def read_mep(msp, grids, nodes, edges):
         xy = [round(ins.dxf.insert.x), round(ins.dxf.insert.y)]
         parts = (attrs.get("HOST") or "").split("|")
         host = None
+        def by_coord(axis, v, tol=300):      # 이름이 바뀌어도 좌표로 그리드를 찾는다
+            c = [g for g in grids.values() if g["axis"] == axis and abs(g["coord"] - float(v)) <= tol]
+            return min(c, key=lambda g: abs(g["coord"] - float(v)))["id"] if c else None
         if parts[0] == "wall" and len(parts) >= 3:
-            host = {"kind": "wall", "edge": parts[1], "side": int(parts[2])}
+            edge = parts[1]
+            if len(parts) >= 4 and edge not in E:            # 좌표로 구간을 다시 찾는다
+                try:
+                    x1, y1, x2, y2 = (float(v) for v in parts[3].split(","))
+                    edge = next((e["id"] for e in edges if e["wall"] and {tuple(N[e["from"]]["xy"]), tuple(N[e["to"]]["xy"])} == {(x1, y1), (x2, y2)}), edge)
+                except ValueError:
+                    pass
+            host = {"kind": "wall", "edge": edge, "side": int(parts[2])}
         elif parts[0] == "bay" and len(parts) >= 4:
             g4 = parts[1].split(",")
+            if len(parts) >= 5 and parts[4].count(",") == 3:
+                try:
+                    cx0, cx1, cy0, cy1 = parts[4].split(",")
+                    g4 = [by_coord("x", cx0) or g4[0], by_coord("x", cx1) or g4[1], by_coord("y", cy0) or g4[2], by_coord("y", cy1) or g4[3]]
+                except ValueError:
+                    pass
             if all(k in grids for k in g4):
                 host = {"kind": "bay", "gx": g4[:2], "gy": g4[2:], "fx": float(parts[2]), "fy": float(parts[3])}
         if host is None and t["host"] == "wall":   # 관계가 심겨 있지 않으면 가장 가까운 벽으로 추정
@@ -426,6 +442,7 @@ def build(dxf_path: Path, sheet: str):
                                  "spec": f'{int(c["w"])}x{int(c["h"])}', "handle": c["handle"], "layer": "COL"}
 
     wall_segs = segments_of(msp, WALL_LAYERS)
+    win_segs = segments_of(msp, WIN_LAYERS)
     wal_only = segments_of(msp, ("WAL",))
 
     def measure_thick(a, b, axis_h, rivals):
@@ -443,7 +460,7 @@ def build(dxf_path: Path, sheet: str):
             ov = min(u1, hi) - max(u0, lo)
             if ov > 0:
                 cover[round(q)] = cover.get(round(q), 0) + ov
-        qs = [q for q, v in cover.items() if v >= (hi - lo) * 0.3]
+        qs = [q for q, v in cover.items() if v >= max(300, (hi - lo) * 0.15)]      # 코어 벽이 겹쳐 한쪽 면이 짧게 남아도 잰다
         return round(max(qs) - min(qs)) if len(qs) >= 2 else None
     hid_segs = segments_of(msp, HID_LAYERS)
 
@@ -462,8 +479,11 @@ def build(dxf_path: Path, sheet: str):
                 wc, wh, _, _ = coverage(a, b, axis_h, wall_segs, WALL_OFF, rivals)
                 hc, hh, _, _ = coverage(a, b, axis_h, hid_segs, WALL_OFF, rivals)
                 both_col = ka in columns and kb in columns
-                is_wall = wc >= WALL_MIN_COVER
-                is_beam = both_col or hc >= HID_MIN_COVER
+                is_wall = bool(wc >= WALL_MIN_COVER)
+                if not is_wall and wc > 0.02:          # 벽 거의 전체가 창(쇼윈도)이면 창호 선도 벽의 증거로 센다
+                    ww, _, _, _ = coverage(a, b, axis_h, win_segs, WALL_OFF, rivals)
+                    is_wall = bool(wc + ww >= 0.6)
+                is_beam = bool(both_col or hc >= HID_MIN_COVER)
                 if not (is_wall or is_beam):
                     continue
                 edges.append({"id": f"{key_of(ka)}~{key_of(kb)}", "from": key_of(ka), "to": key_of(kb), "along": gid,

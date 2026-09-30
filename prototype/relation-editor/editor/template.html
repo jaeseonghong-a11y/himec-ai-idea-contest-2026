@@ -433,7 +433,7 @@ function initModel(src) {
       if (!t) { t = { id: (o.band ? "BD" : "XT") + (++nb), kind: o.type, width: o.width, leaves: o.leaves, band: !!o.band, donor: null, local: true, total: 1, by_sheet: { [g.sheet]: 1 }, instances: [] }; g.otypes.push(t); }
       o.otype = t.id;
     });
-    return g;
+    return finishModel(g);
   }
   // 일람표가 없으면 이 도면만으로 만든다: 종류·띠 여부·짝 수·폭으로 묶는다. 각 타입은 복사해 올 원본(donor)을 기억한다
   const groups = {};
@@ -444,7 +444,13 @@ function initModel(src) {
   order.forEach(grp => { const o = grp[0], id = o.type === "window" ? "WT" + (++nw) : "DT" + (++nd);
     g.otypes.push({ id, kind: o.type, width: o.width, leaves: o.leaves, band: !!o.band, donor: { sheet: g.sheet, id: o.id, handles: o.handles, xy: o.xy, horiz: o.horiz } });
     grp.forEach(x => { x.otype = id; }); });
-  return g;
+  return finishModel(g);
+}
+function finishModel(g) {
+  // 도면에서 읽은 코어: 위치와 벽은 다시 계산한다 (읽은 rect 는 숫자 네 개일 뿐)
+  (g.cores || []).forEach(c => { if (Array.isArray(c.rect)) delete c.rect; if (!c.kind) c.kind = (coreType(c.type) || {}).kind; });
+  g.cores = (g.cores || []).filter(c => coreType(c.type) && g.grids[c.anchor[0]] && g.grids[c.anchor[1]]);
+  return recompute(g);
 }
 function typeSpec(g, id) { const t = g.types.find(t => t.id === id); return t ? t.spec : null; }
 
@@ -522,10 +528,18 @@ function recomputeMep(g, E) {
   });
   g.mep.routes.forEach(r => { r.pts = r.pts0.map(q => [Math.round(q[0] + bandShift(g, q[0], "x", r.ref)), Math.round(q[1] + bandShift(g, q[1], "y", r.ref))]); });
 }
-function hostText(d) {
+function hostKey(d) {      // 관계가 바뀌었는지 볼 때는 이름만 비교한다(좌표는 그리드 이동으로도 바뀜)
+  const h = d.host; return !h ? "" : h.kind === "wall" ? `wall|${h.edge}|${h.side}` : `bay|${h.gx.join(",")},${h.gy.join(",")}|${h.fx.toFixed(4)}|${h.fy.toFixed(4)}`;
+}
+function hostText(d, g) {
+  // 도면에 심는 관계. 그리드 이름은 다시 읽을 때 좌표순으로 다시 붙으므로 좌표도 같이 적는다
   const h = d.host;
   if (!h) return "";
-  return h.kind === "wall" ? `wall|${h.edge}|${h.side}` : `bay|${h.gx[0]},${h.gx[1]},${h.gy[0]},${h.gy[1]}|${h.fx.toFixed(4)}|${h.fy.toFixed(4)}`;
+  const G = g || (typeof ORIG !== "undefined" ? ORIG : null);
+  if (h.kind === "wall") { const e = G && G.edges.find(x => x.id === h.edge), N = G && idx(G.nodes), a = e && N[e.from], b = e && N[e.to];
+    return `wall|${h.edge}|${h.side}` + (a && b ? `|${a.xy[0]},${a.xy[1]},${b.xy[0]},${b.xy[1]}` : ""); }
+  const c = k => G && G.grids[k] ? G.grids[k].coord : "";
+  return `bay|${h.gx[0]},${h.gx[1]},${h.gy[0]},${h.gy[1]}|${h.fx.toFixed(4)}|${h.fy.toFixed(4)}|${c(h.gx[0])},${c(h.gx[1])},${c(h.gy[0])},${c(h.gy[1])}`;
 }
 function addDevice(g, typeId, where) {
   // where: {edge, a, side} (벽 부착) 또는 {x, y} (구획 배치)
@@ -537,11 +551,12 @@ function addDevice(g, typeId, where) {
   let host;
   if (t.host === "wall") {
     const e = g.edges.find(x => x.id === where.edge);
-    if (!e || !e.wall) return null;
+    if (!e || !e.wall || e.diag || !Number.isFinite(where.a)) return null;      // 사선 벽과 좌표 없는 요청은 거부
     host = { kind: "wall", edge: e.id, side: where.side || 1, a0: Math.round(where.a / SNAP) * SNAP, offset: 150 };
   } else {
     const cell = axis => { const cs = Object.values(g.grids).filter(x => x.axis === axis).sort((a, b) => a.coord - b.coord), v = axis === "x" ? where.x : where.y;
       const lo = cs.filter(c => c.coord <= v).pop(), hi = cs.find(c => c.coord > v); return lo && hi ? [lo, hi] : null; };
+    if (!Number.isFinite(where.x) || !Number.isFinite(where.y)) return null;
     const cx = cell("x"), cy = cell("y");
     if (!cx || !cy) return null;
     host = { kind: "bay", gx: [cx[0].id, cx[1].id], gy: [cy[0].id, cy[1].id], fx: (where.x - cx[0].coord) / (cx[1].coord - cx[0].coord), fy: (where.y - cy[0].coord) / (cy[1].coord - cy[0].coord) };
@@ -558,7 +573,7 @@ function mepDiff(orig, g) {
   const OD = idx(orig.mep.devices), GD = idx(g.mep.devices);
   g.mep.devices.forEach(x => { const o = OD[x.id];
     if (!o) { d.added.push(x); return; }
-    if (o.xy[0] !== x.xy[0] || o.xy[1] !== x.xy[1]) d.moved.push({ id: x.id, type: x.type, from: o.xy, to: x.xy, handle: x.handle, edited: x.shift !== 0 || hostText(x) !== hostText(o), host: hostText(x) });
+    if (o.xy[0] !== x.xy[0] || o.xy[1] !== x.xy[1]) d.moved.push({ id: x.id, type: x.type, from: o.xy, to: x.xy, handle: x.handle, edited: x.shift !== 0 || hostKey(x) !== hostKey(o), host: hostText(x, g) });
     if (x.orphan && !o.orphan) d.orphaned.push(x); });
   orig.mep.devices.forEach(o => { if (!GD[o.id]) d.deleted.push(o); });
   const OR = idx(orig.mep.routes);
@@ -706,6 +721,17 @@ function outsideDiagonal(g) {
       if ((d.xy[0] - a[0]) * nx + (d.xy[1] - a[1]) * ny > (e.thick || 200) / 2) out.push({ device: d.id, edge: e.id }); }); });
   return out;
 }
+function overlapsOf(g, o) {
+  // 같은 벽 위에서 이 개구부와 겹치는 다른 개구부의 이름
+  return g.openings.filter(p => p !== o && p.on_edge === o.on_edge && !p.band && !o.band && Math.abs(p.a - o.a) < (p.width + o.width) / 2).map(p => p.id);
+}
+function clearSpan(g, e) {
+  // 벽 구간에서 문·창호를 놓을 수 있는 범위: 양 끝 기둥 면 사이
+  const N = idx(g.nodes), a = N[e.from], b = N[e.to]; if (!a || !b || e.diag) return null;
+  const horiz = g.grids[e.along].axis === "y", c = n => horiz ? n.xy[0] : n.xy[1], half = n => n.type === "column" && n.spec ? (horiz ? parseSpec(n.spec).w : parseSpec(n.spec).h) / 2 : 0;
+  const [p, q] = c(a) <= c(b) ? [a, b] : [b, a];
+  return [c(p) + half(p), c(q) - half(q)];
+}
 function addDiagonal(g, a, b, kind) {
   // 사선 벽·보: 서로 다른 세로·가로 그리드에 있는 두 교점을 잇는다. 그리드는 그대로 둔다
   if (!a || !b || a.xi === b.xi || a.yj === b.yj) return null;
@@ -778,9 +804,9 @@ function diff(orig, g) {
   orig.edges.forEach(o => { if (!GE[o.id]) { if (o.wall) d.walls_deleted.push({ id: o.id, along: o.along, ...endsNow(o) }); if (o.beam) d.beams_deleted.push({ id: o.id, along: o.along, evidence: o.beam_evidence, ...endsNow(o) }); } });
   const OO = idx(orig.openings), GO = idx(g.openings);
   g.openings.forEach(o => { const p = OO[o.id];
-    if (!p) { const e = GE[o.on_edge]; d.openings_added.push({ id: o.id, type: o.type, otype: o.otype, leaves: o.leaves, horiz: o.horiz, center: o.xy, width: o.width, on_edge: o.on_edge, thick: e.thick, wall_lw: e.wall_lw }); return; }
+    if (!p) { const e = GE[o.on_edge]; d.openings_added.push({ id: o.id, type: o.type, otype: o.otype, leaves: o.leaves, horiz: o.horiz, center: o.xy, width: o.width, on_edge: o.on_edge, thick: e.thick, wall_lw: e.wall_lw, clear: clearSpan(g, e), overlaps: overlapsOf(g, o) }); return; }
     const moved = p.xy[0] !== o.xy[0] || p.xy[1] !== o.xy[1], retype = p.otype !== o.otype, edited = o.shift !== 0 || retype || p.width !== o.width;
-    if (moved || edited) d.openings.push({ id: o.id, type: o.type, band: !!p.band, leaves: p.leaves, horiz: o.horiz, moved, edited, retype, shift: o.shift, from_type: p.otype, to_type: o.otype, from_w: p.width, to_w: o.width, to_leaves: o.leaves, to_xy: o.xy, handles: o.handles }); });
+    if (moved || edited) d.openings.push({ id: o.id, type: o.type, band: !!p.band, leaves: p.leaves, horiz: o.horiz, moved, edited, retype, shift: o.shift, from_type: p.otype, to_type: o.otype, from_w: p.width, to_w: o.width, to_leaves: o.leaves, to_xy: o.xy, handles: o.handles, clear: clearSpan(g, GE[o.on_edge]), overlaps: overlapsOf(g, o) }); });
   orig.openings.forEach(p => { if (!GO[p.id]) d.openings_deleted.push({ id: p.id, type: p.type, horiz: p.horiz, width: p.width, handles: p.handles, on_edge: p.on_edge }); });
   const OD = Object.fromEntries(orig.dims.map(x => [x.handle, x])), GD = new Set(g.dims.map(x => x.handle));
   g.dims.forEach(x => { if (OD[x.handle] && OD[x.handle].measurement !== x.measurement) d.dims.push({ handle: x.handle, from_grid: x.from_grid, to_grid: x.to_grid, from: OD[x.handle].measurement, to: x.measurement }); });
@@ -842,6 +868,11 @@ function rawWarnings(orig, g) {
     g.openings.forEach(o => { const hw = o.width / 2, b = o.horiz ? [o.xy[0] - hw, o.xy[1] - 150, o.xy[0] + hw, o.xy[1] + 150] : [o.xy[0] - 150, o.xy[1] - hw, o.xy[0] + 150, o.xy[1] + hw];
       if (r.walls.some(k => k.x0 < b[2] && k.x1 > b[0] && k.y0 < b[3] && k.y1 > b[1])) w.push(`${c.id} ${t.name}: 코어 벽이 ${o.type === "door" ? "문" : "창호"} ${o.id}에 닿음. 코어나 ${o.type === "door" ? "문" : "창호"}을 옮겨야 함`); });
     if (r.gap && r.gap.width > (r.gap.side === "N" || r.gap.side === "S" ? r.x1 - r.x0 : r.lead || r.y1 - r.y0) - 1) w.push(`${c.id} ${t.name}: 입구가 면 전체를 차지함`);
+    { const N3 = idx(g.nodes), hit = new Set();      // 코어 벽이 건물 벽 위에 겹쳐 놓임
+      g.edges.filter(e => e.wall && !e.diag).forEach(e => { const a = N3[e.from].xy, b = N3[e.to].xy, hz = a[1] === b[1], t2 = (e.thick || 200) / 2;
+        const bx = hz ? [Math.min(a[0], b[0]), a[1] - t2, Math.max(a[0], b[0]), a[1] + t2] : [a[0] - t2, Math.min(a[1], b[1]), a[0] + t2, Math.max(a[1], b[1])];
+        r.walls.forEach(k => { const ox = Math.min(k.x1, bx[2]) - Math.max(k.x0, bx[0]), oy = Math.min(k.y1, bx[3]) - Math.max(k.y0, bx[1]); if (ox > 300 && oy > 30 || oy > 300 && ox > 30) hit.add(SIDE_NAME[k.side]); }); });
+      if (hit.size) w.push(`${c.id} ${t.name}: ${[...hit].join("·")} 면의 코어 벽이 건물 벽과 겹침. 그 면의 코어 벽을 끄면 됨`); }
     if (c.kind === "elevator" && !r.gap) w.push(`${c.id} ${t.name}: 입구 면에 벽을 세우지 않아 입구가 표시되지 않음`);
     if (r.walls.length === 0) w.push(`${c.id} ${t.name}: 둘러싼 벽이 하나도 없음`);
     cs.slice(i + 1).forEach(o => { const q = o.rect; if (r.x0 < q.x1 - 1 && r.x1 > q.x0 + 1 && r.y0 < q.y1 - 1 && r.y1 > q.y0 + 1) w.push(`${c.id}와 ${o.id}가 겹침`); });
@@ -872,14 +903,14 @@ function exportChanges(orig, g, reviewer) {
   d.nodes.filter(n => n.respec).forEach(n => add(n.id, "resize", { spec: n.to_spec, type: n.to_type }, `${n.id} resize ${n.to_spec}` + (n.retype ? ` (타입 ${n.from_type} → ${n.to_type})` : ""),
     [{ element: n.id, kind: "column", change: `단면 ${n.from_spec} → ${n.to_spec}`, handle: n.handle, new_spec: n.to_spec, old_spec: n.from_spec }]));
   const donorOf = id => { const t = g.otypes.find(x => x.id === id); return t && t.donor && !t.band ? t.donor : null; };
-  d.openings.filter(o => o.edited).forEach(o => add(o.id, "edit_opening", { type: o.type, band: o.band, leaves: o.leaves, horiz: o.horiz, shift: o.shift, type_from: o.from_type, type_to: o.to_type, width_from: o.from_w, width_to: o.to_w, leaves_to: o.to_leaves,
+  d.openings.filter(o => o.edited).forEach(o => add(o.id, "edit_opening", { type: o.type, band: o.band, leaves: o.leaves, horiz: o.horiz, shift: o.shift, type_from: o.from_type, type_to: o.to_type, width_from: o.from_w, width_to: o.to_w, leaves_to: o.to_leaves, clear: o.clear, overlaps: o.overlaps,
       donor: o.retype ? donorOf(o.to_type) : null, center_to: o.to_xy, handles: o.handles },
     `${o.id}` + (o.shift ? ` 이동 ${o.shift}` : "") + (o.retype ? ` 타입 ${o.from_type}(${o.from_w}) → ${o.to_type}(${o.to_w})` : "")));
   d.grids_added.forEach(x => add(x.id, "add_grid", { axis: x.axis, coord: x.coord, lo: x.lo, hi: x.hi }, `${x.id} 그리드 추가 ${x.axis}=${x.coord}`));
   d.cols_added.forEach(c => add(c.id, "add_column", { grid: c.grid, xy: c.xy, spec: c.spec, type: c.type }, `기둥 추가 ${c.grid.join("-")} ${c.type} ${c.spec}`));
   d.walls_added.forEach(e => add(e.id, "add_wall", { from_xy: e.from_xy, to_xy: e.to_xy, thick: e.thick, lw: e.lw }, `${e.id} 벽 추가 (두께 ${e.thick}, 선 굵기 ${(e.lw / 100).toFixed(2)})`));
   d.beams_added.forEach(e => add(e.id, "add_beam", { from_xy: e.from_xy, to_xy: e.to_xy, width: e.width || 400, kind: e.kind, span: e.span, lw: e.lw }, `${e.id} ${e.kind === "girder" ? "거더" : "보"} 추가 (경간 ${e.span}, 선 굵기 ${(e.lw / 100).toFixed(2)})`));
-  d.openings_added.forEach(o => add(o.id, "add_opening", { type: o.type, otype: o.otype, leaves: o.leaves, horiz: o.horiz, center: o.center, width: o.width, thick: o.thick, wall_lw: o.wall_lw, on_edge: o.on_edge, donor: donorOf(o.otype) }, `${o.id} ${o.type === "door" ? "문" : "창호"} 추가 ${o.otype} 폭 ${o.width}`));
+  d.openings_added.forEach(o => add(o.id, "add_opening", { type: o.type, otype: o.otype, leaves: o.leaves, horiz: o.horiz, center: o.center, width: o.width, thick: o.thick, wall_lw: o.wall_lw, clear: o.clear, overlaps: o.overlaps, on_edge: o.on_edge, donor: donorOf(o.otype) }, `${o.id} ${o.type === "door" ? "문" : "창호"} 추가 ${o.otype} 폭 ${o.width}`));
   // 대지, 코어, 자동 치수
   if (d.site_changed && g.site) add("SITE", "set_site", { pts: g.site.pts, area_m2: projectInfo(g).site_m2 }, `대지경계선 ${g.site.pts.length}점, ${projectInfo(g).site_m2} ㎡`);
   d.cores_deleted.forEach(c => add(c.id, "delete_core", { type: c.type, rect: c.rect }, `${c.id} ${coreType(c.type).name} 삭제`));
@@ -896,7 +927,7 @@ function exportChanges(orig, g, reviewer) {
   if (M.moved.length) add("MEP", "mep_relocate", { items: M.moved.map(x => ({ id: x.id, type: x.type, handle: x.handle, from_xy: x.from, to_xy: x.to, host: x.host, edited: x.edited })) },
     `기구 ${M.moved.length}개 재배치 (직접 편집 ${M.moved.filter(x => x.edited).length}, 건축 변경에 따른 자동 ${M.moved.filter(x => !x.edited).length})`);
   M.routes.forEach(r => add(r.id, "mep_route", { handle: r.handle, pts: r.to }, `${r.id} 덕트 경로 변경`));
-  M.added.forEach(x => add(x.id, "mep_add", { type: x.type, xy: x.xy, rotation: x.host && x.host.kind === "wall" ? (x.horiz ? (x.host.side > 0 ? 0 : 180) : (x.host.side > 0 ? -90 : 90)) : 0, host: hostText(x) }, `${x.id} ${tname(x.type)} 추가`));
+  M.added.forEach(x => add(x.id, "mep_add", { type: x.type, xy: x.xy, rotation: x.host && x.host.kind === "wall" ? (x.horiz ? (x.host.side > 0 ? 0 : 180) : (x.host.side > 0 ? -90 : 90)) : 0, host: hostText(x, g) }, `${x.id} ${tname(x.type)} 추가`));
   if (out.length) out[out.length - 1].warnings = W;
   return out;
 }
