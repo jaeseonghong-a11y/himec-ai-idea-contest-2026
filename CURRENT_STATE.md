@@ -1,6 +1,8 @@
 # CURRENT_STATE.md — 최신 인수인계
 
-## 현재 상태 (2026-09-30, 팀장 AI)
+## 현재 상태 (2026-10-01, 팀장 AI)
+
+- 2026-10-01 저장소 첫 화면 `README.md`를 현재 출품 방향(회의 녹음·AutoCAD·관계도), 2024/2026 소스와 Release의 차이, 빠른 시작 링크, 시험 근거와 미검증 경계에 맞춰 갱신했다. 문서만 변경했으며 새 빌드·설치·제출이나 실제 호스트 검증은 수행하지 않았다. `autocad-plugin/`, `prototype/relation-editor/`와 공통 안내 문서를 연결했으며 다른 브랜치의 코드는 변경하지 않았다. Recommended Next Step: 팀장이 실제 제출 여부와 최종 자료를 별도로 확인하고, 통합 배포판이 필요하면 두 AutoCAD 버전의 호스트 시험 후 제작한다.
 
 - 2026-09-30 박성훈(`archuni`)의 [PR #34](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/34)를 먼저 병합(`edb134e`)하고, `r03` 최종 SHA `5983ea95`의 2024 플러그인·PDF/JSON·합성 시험 자료를 [통합 PR #59](https://github.com/jaeseonghong-a11y/himec-ai-idea-contest-2026/pull/59)로 병합(`c7a3c0d`)했다. 중복 PR #50은 닫고 브랜치는 보존했다. 2026의 승인·실행 UI를 유지하며 PDF/JSON 내보내기를 추가했고, 김기준 관계도 편집기는 동일 도면의 핸들/축 연결과 불일치 시 수동 확인을 하도록 최소 보완했다. 확인: 공용 코어 net8.0/net48, 2026 Release 빌드(기존 WindowsBase 경고 1), 관계도 로직 47/47·118/118, 실제 팀원 JSON을 이용한 안전한 불러오기 테스트. 박성훈의 2024 호스트 결과는 `autocad-plugin/tests/SMOKE_TEST_2024.md`에 기록돼 있으나 이 PC에 2024가 없어 재검증하지 않았다. 실제 DWG→DXF 관계도 핸들 일치, 승인 후 이동/UNDO, 새 통합 UI의 2024/2026 호스트 확인은 미검증이다. 소스만 병합했으며 새 배포판은 아직 만들지 않았다. Recommended Next Step: 합성 시험 DWG를 DXF로 변환해 관계도를 생성하고 JSON의 #8E/X1-Y2가 같은 기둥에 닿는지 양쪽 버전 호스트에서 확인한 뒤 배포판을 만든다.
 
