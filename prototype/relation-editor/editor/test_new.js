@@ -232,6 +232,19 @@ G = fresh(); C.newProjectDemo(G);
   const ex = C.exportChanges(ORIG, G, "시험");
   ok("내보내기: 새 축 X2A와 그 교점의 기둥, 나뉜 벽", ex.some(c => c.action === "add_grid" && c.target === "X2A") && ex.some(c => c.action === "add_column" && c.params.grid[0] === "X2A")); }
 
+// 양방향 어긋남 → 축 둘, 원래 축을 옮기면 보조 축도 따라감, 어긋난 기둥이 창호와 겹치면 경고
+G = fresh(); C.newProjectDemo(G);
+{ const n = G.nodes.find(x => x.grid[0] === "X3" && x.grid[1] === "Y2"); C.offsetColumn(G, n.id, -350, 400);
+  const r = C.offsetToGrid(G, n.id);
+  ok("양방향 어긋남은 축 둘(X3A, Y2A)이 생기고 기둥은 그 교점에", r && r.grids.join() === "X3A,Y2A" && G.grids.X3A.coord === 14650 && G.grids.Y2A.coord === 9900 && G.nodes.some(x => x.id === r.node && x.type === "column" && x.grid.join() === "X3A,Y2A"), JSON.stringify(r));
+  C.moveGridTo(G, "X3", 15500);
+  ok("원래 축 X3을 +500 옮기면 보조 축 X3A도 함께", G.grids.X3A.coord === 15150);
+  const m = G.nodes.find(x => x.grid[0] === "X1" && x.grid[1] === "Y3"), e = G.edges.find(x => x.wall && x.along === "Y3" && (x.from === m.id || x.to === m.id));
+  const wt0 = G.otypes.filter(t => t.kind === "window" && t.width <= 1200).sort((a, b) => b.width - a.width)[0] || G.otypes.find(t => t.kind === "window");
+  const wid = C.addOpening(G, e.id, "window", 4300, wt0.id);      // X1에서 1300 떨어진 창
+  C.offsetColumn(G, m.id, 1200, 0);
+  ok("어긋난 기둥이 창호 자리를 침범하면 경고", C.warnings(ORIG, G).some(w => w.includes("X1-Y3") && w.includes(wid) && w.includes("겹침")), C.warnings(ORIG, G).filter(w => w.includes("X1-Y3")).join(" | ")); }
+
 // 긴 층고: 3 m 마다 계단참
 { const k = C.stairCalc(7000, 1200);
   ok("층고 7000이면 한 번에 오르는 높이가 3 m를 넘어 중간 계단참이 생김", !!k.mid_landing && k.mid_landing.depth === 1200 && k.length === k.run + 1200 + 1200 && k.riser <= 180, JSON.stringify(k.mid_landing));

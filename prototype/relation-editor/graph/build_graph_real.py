@@ -403,6 +403,9 @@ def read_cores(msp, grids):
             c = [g for g in grids.values() if g["axis"] == axis and abs(g["coord"] - v) <= tol]
             return min(c, key=lambda g: abs(g["coord"] - v))["id"] if c else None
         gx, gy = nearest("x", ax), nearest("y", ay)
+        if info.get("anchor_xy") and all(v is not None for v in info["anchor_xy"]):      # 심어 둔 기준 교점 좌표가 있으면 그것으로 (보조 축이 가까이 있어도 헷갈리지 않게)
+            gx = nearest("x", info["anchor_xy"][0], 10) or gx
+            gy = nearest("y", info["anchor_xy"][1], 10) or gy
         c = {"id": info["id"], "type": info["type"], "kind": info["kind"], "anchor": [gx, gy], "anchor_xy": [grids[gx]["coord"] if gx else None, grids[gy]["coord"] if gy else None], "dir": d, "side": sd, "entry": info.get("entry"), "travel": info.get("travel"),
              "walls": info.get("walls"), "wall_thick": info.get("wt"), "rect": [round(x0), round(y0), round(x1), round(y1)], "handle": e.dxf.handle, "anchored": bool(gx and gy)}
         cores.append(c)

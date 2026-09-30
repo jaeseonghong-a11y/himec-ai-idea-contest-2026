@@ -669,8 +669,10 @@ function gridLimits(g, id) {
   return { min: below.length ? Math.max(...below) + MIN_GAP : -Infinity, max: above.length ? Math.min(...above) - MIN_GAP : Infinity };
 }
 function moveGridTo(g, id, coord) {
-  const lim = gridLimits(g, id);
+  const lim = gridLimits(g, id), before = g.grids[id].coord;
   g.grids[id].coord = Math.min(lim.max, Math.max(lim.min, Math.round(coord)));
+  const d = g.grids[id].coord - before;
+  if (d) Object.values(g.grids).filter(x => x.base === id).forEach(x => { x.coord += d; });      // 보조 축(어긋남에서 생긴 축)은 원래 축을 따라간다
   return recompute(g);
 }
 function addGrid(g, axis, coord, refId) {
@@ -767,42 +769,39 @@ function offsetColumn(g, id, dx, dy, absolute) {
   recompute(g); return true;
 }
 function offsetToGrid(g, id) {
-  // 어긋난 기둥을 새 축 위에 놓는다: 어긋난 방향마다 보조 그리드(X2A 같은 이름)를 세우고 기둥을 그 교점으로 옮긴다.
-  // 기둥을 지나던 직각 방향 구간은 새 교점에서 둘로 나뉘고, 축 치수열에 그 거리가 들어간다
-  const n = g.nodes.find(x => x.id === id);
+  // 어긋난 기둥을 새 축 위에 놓는다: 어긋난 방향마다 보조 축(X2A 같은 이름)을 세우고 기둥을 그 교점으로 옮긴다.
+  // 기둥을 지나던 직각 방향 구간은 새 교점에서 둘로 나뉘고, 축 치수열에 그 거리가 들어간다. 양방향이면 축이 두 개 생긴다
+  let n = g.nodes.find(x => x.id === id);
   if (!n || n.type !== "column" || (!n.off[0] && !n.off[1])) return null;
   const made = [];
-  [0, 1].forEach(ax => { if (!n.off[ax]) return;
-    const base = g.grids[n.grid[ax]], axis = base.axis, off0 = n.off[ax], coord = base.coord + off0;
+  for (const ax of [0, 1]) {
+    const off0 = n.off[ax]; if (!off0) continue;
+    const base = g.grids[n.grid[ax]], axis = base.axis, coord = base.coord + off0, other = ax ? 0 : 1;
     let gid = Object.values(g.grids).find(x => x.axis === axis && Math.abs(x.coord - coord) < 1);      // 이미 그 자리에 축이 있으면 그것을 쓴다
-    if (!gid) { if (Object.values(g.grids).some(x => x.axis === axis && Math.abs(x.coord - coord) < 100)) return;      // 보조 축은 100까지 붙을 수 있다
-      let name = base.id + "A"; for (const s of "ABCDEFGH") { name = base.id + s; if (!g.grids[name]) break; }
-      const r = gridRange(g, axis); gid = g.grids[name] = { id: name, axis, coord, lo: r[0], hi: r[1], handles: [], added: true, sub: true }; }
-    const oldId = n.id, oldGrid = n.grid.slice(), other = ax ? 0 : 1;
-    // 새 교점에 기둥을 두고, 옛 교점은 남은 구간이 있으면 교점으로 남긴다
+    if (!gid) { if (Object.values(g.grids).some(x => x.axis === axis && Math.abs(x.coord - coord) < 100)) continue;      // 보조 축은 100까지 붙을 수 있다
+      let name = base.id + "A"; for (const c of "ABCDEFGH") { name = base.id + c; if (!g.grids[name]) break; }
+      const r = gridRange(g, axis); gid = g.grids[name] = { id: name, axis, coord, lo: r[0], hi: r[1], handles: [], added: true, sub: true, base: base.id }; }
+    const oldId = n.id, oldGrid = n.grid.slice();
     const col = { id: `N@${ax === 0 ? gid.id : oldGrid[0]}-${ax === 0 ? oldGrid[1] : gid.id}`, type: "column", grid: ax === 0 ? [gid.id, oldGrid[1]] : [oldGrid[0], gid.id], ctype: n.ctype, spec: n.spec, off: [0, 0], added: true };
-    col.off[other] = n.off[other];
-    g.nodes.push(col);
+    col.off[other] = n.off[other];                                          // 남은 방향의 어긋남은 새 기둥이 이어받는다
+    if (g.nodes.some(x => x.grid[0] === col.grid[0] && x.grid[1] === col.grid[1])) { const ex = g.nodes.find(x => x.grid[0] === col.grid[0] && x.grid[1] === col.grid[1]); ex.type = "column"; ex.ctype = col.ctype; ex.spec = col.spec; ex.off = col.off; col.id = ex.id; }
+    else g.nodes.push(col);
     n.type = "joint"; delete n.ctype; delete n.spec; n.off = [0, 0];
-    // 기둥을 지나던 직각 방향 구간(옛 교점의 other 축 그리드 위)을 새 교점에서 나눈다
-    g.edges.filter(e => e.along === oldGrid[other] && (e.from === oldId || e.to === oldId)).forEach(e => {
+    g.edges.filter(e => e.along === oldGrid[other] && (e.from === oldId || e.to === oldId)).forEach(e => {      // 기둥을 지나던 직각 방향 구간을 새 교점에서 나눈다
       const far = e.from === oldId ? e.to : e.from, farN = g.nodes.find(x => x.id === far);
-      const dir = Math.sign(farN.xy[ax] - base.coord);                 // 이 구간이 어긋난 방향 쪽에 있으면 새 교점을 지난다
+      const dir = Math.sign(farN.xy[ax] - base.coord);
       if (dir === Math.sign(off0) && dir !== 0) {
         const near = { ...e, id: `${oldId}~${col.id}`, from: oldId, to: col.id, added: true }, rest = { ...e, id: `${col.id}~${far}`, from: col.id, to: far, added: true };
         g.edges = g.edges.filter(x => x !== e); g.edges.push(near, rest);
-        const cut = coord;                                             // 개구부·기구는 자리에 따라 나뉜 구간으로
-        g.openings.forEach(o => { if (o.on_edge === e.id) o.on_edge = ((o.a < cut) === (base.coord < cut)) ? near.id : rest.id; });
-        if (g.mep) g.mep.devices.forEach(d => { if (d.host && d.host.kind === "wall" && d.host.edge === e.id) d.host.edge = ((d.host.a0 < cut) === (base.coord < cut)) ? near.id : rest.id; });
-      }                                                                // 반대쪽 구간은 옛 교점까지 그대로
-    });
-    // 어긋난 축 방향의 구간(옛 교점을 지나는 같은 방향 벽·보)은 그대로 둔다 — 기둥이 그 줄에서 벗어난 것
-    made.push(gid.id); n.off = [0, 0]; Object.assign(n, { id: oldId });
-    // 다음 축 처리를 위해 n 을 새 기둥으로 바꾼다
-    n.__next = col; });
-  let cur = n; while (cur.__next) { const nx = cur.__next; delete cur.__next; cur = nx; }
-  pruneNodes(g); recompute(g);
-  return { grids: made, node: cur.id };
+        g.openings.forEach(o => { if (o.on_edge === e.id) o.on_edge = ((o.a < coord) === (base.coord < coord)) ? near.id : rest.id; });
+        if (g.mep) g.mep.devices.forEach(d => { if (d.host && d.host.kind === "wall" && d.host.edge === e.id) d.host.edge = ((d.host.a0 < coord) === (base.coord < coord)) ? near.id : rest.id; });
+      } });
+    made.push(gid.id);
+    pruneNodes(g); recompute(g);
+    n = g.nodes.find(x => x.id === col.id);                                  // 다음 방향은 새 기둥을 기준으로
+  }
+  recompute(g);
+  return { grids: made, node: n.id };
 }
 function deleteColumn(g, id) {
   const n = g.nodes.find(x => x.id === id);
@@ -840,9 +839,9 @@ function overlapsOf(g, o) {
 function clearSpan(g, e) {
   // 벽 구간에서 문·창호를 놓을 수 있는 범위: 양 끝 기둥 면 사이
   const N = idx(g.nodes), a = N[e.from], b = N[e.to]; if (!a || !b || e.diag) return null;
-  const horiz = g.grids[e.along].axis === "y", c = n => horiz ? n.xy[0] : n.xy[1], half = n => n.type === "column" && n.spec ? (horiz ? parseSpec(n.spec).w : parseSpec(n.spec).h) / 2 : 0;
+  const horiz = g.grids[e.along].axis === "y", c = n => horiz ? n.xy[0] : n.xy[1], cc = n => horiz ? (n.cxy || n.xy)[0] : (n.cxy || n.xy)[1], half = n => n.type === "column" && n.spec ? (horiz ? parseSpec(n.spec).w : parseSpec(n.spec).h) / 2 : 0;
   const [p, q] = c(a) <= c(b) ? [a, b] : [b, a];
-  return [c(p) + half(p), c(q) - half(q)];
+  return [Math.max(c(p), cc(p) + half(p)), Math.min(c(q), cc(q) - half(q))];      // 어긋난 기둥은 그 실제 면까지
 }
 function addDiagonal(g, a, b, kind) {
   // 사선 벽·보: 서로 다른 세로·가로 그리드에 있는 두 교점을 잇는다. 그리드는 그대로 둔다
@@ -1001,7 +1000,9 @@ function rawWarnings(orig, g) {
     const bad = [];
     if (Math.abs(n.off[0]) > sp.w / 2 - 50 && g.edges.some(e => (e.wall || e.beam) && e.along === n.grid[0] && (e.from === n.id || e.to === n.id))) bad.push(`${n.grid[0]} 줄의 벽·보 중심선이 기둥 밖(가로 ${Math.abs(n.off[0])} 어긋남, 단면 ${sp.w})`);
     if (Math.abs(n.off[1]) > sp.h / 2 - 50 && g.edges.some(e => (e.wall || e.beam) && e.along === n.grid[1] && (e.from === n.id || e.to === n.id))) bad.push(`${n.grid[1]} 줄의 벽·보 중심선이 기둥 밖(세로 ${Math.abs(n.off[1])} 어긋남, 단면 ${sp.h})`);
-    if (bad.length) w.push(`기둥 ${n.grid.join("-")}: ${bad.join("; ")}. 구조 검토`); });
+    if (bad.length) w.push(`기둥 ${n.grid.join("-")}: ${bad.join("; ")}. 구조 검토`);
+    g.openings.forEach(o => { const hw = o.width / 2, ob = o.horiz ? [o.xy[0] - hw, o.xy[1] - 200, o.xy[0] + hw, o.xy[1] + 200] : [o.xy[0] - 200, o.xy[1] - hw, o.xy[0] + 200, o.xy[1] + hw];
+      if (n.cxy[0] + sp.w / 2 > ob[0] && n.cxy[0] - sp.w / 2 < ob[2] && n.cxy[1] + sp.h / 2 > ob[1] && n.cxy[1] - sp.h / 2 < ob[3]) w.push(`기둥 ${n.grid.join("-")}: 옮긴 자리가 ${o.type === "door" ? "문" : "창호"} ${o.id}와 겹침. 기둥이나 ${o.type === "door" ? "문" : "창호"}을 옮겨야 함`); }); });
   { const N2 = idx(g.nodes), seen = new Set();      // 벽 두께
     g.edges.filter(e => e.wall && !e.diag).forEach(e => { [e.from, e.to].forEach(id => { const n = N2[id]; if (!n || n.type !== "column" || !n.spec) return; const sp = parseSpec(n.spec), lim = g.grids[e.along].axis === "y" ? sp.h : sp.w;
       if (e.thick > lim && !seen.has(e.id)) { seen.add(e.id); w.push(`벽 ${e.id}: 두께 ${e.thick}이 기둥 ${n.grid.join("-")}의 폭 ${lim}보다 커서 기둥 밖으로 나옴`); } });
