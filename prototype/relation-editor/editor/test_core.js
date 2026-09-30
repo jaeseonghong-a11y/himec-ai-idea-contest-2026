@@ -133,7 +133,7 @@ fs.writeFileSync(path.join(outDir, "changes_demo.json"), JSON.stringify(out, nul
 // 왕복 검증용 기대값: 편집기의 최종 상태
 const dd = C.diff(ORIG, G), N = C.idx(G.nodes), lab = n => n.grid.join("-");
 const expected = {
-  columns: G.nodes.filter(n => n.type === "column").map(n => ({ label: lab(n), xy: n.xy, spec: n.spec })),
+  columns: G.nodes.filter(n => n.type === "column").map(n => ({ label: lab(n), xy: n.cxy || n.xy, spec: n.spec })),
   columns_deleted: dd.cols_deleted.map(c => ({ label: c.grid.join("-"), xy: c.xy })),
   walls_checked: [...dd.walls_added.map(e => ({ label: e.id, from_xy: e.from_xy, to_xy: e.to_xy, expect: true })), ...dd.walls_deleted.map(e => ({ label: e.id, from_xy: e.from_xy, to_xy: e.to_xy, expect: false }))],
   openings_checked: [...dd.openings_added.map(o => ({ id: o.id, type: o.type, xy: o.center, width: o.width, expect: true })),

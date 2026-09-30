@@ -35,7 +35,7 @@ OUT = ROOT / "out" / "real"
 WALLS = ("WAL", "마감선", "단열재", "COL")   # 이 도면은 콘크리트 벽체를 COL 레이어에 그린다
 ZONE = 450        # 벽 중심(그리드)에서 벽선이 있을 수 있는 거리
 JAMB = 200        # 문틀 주변으로 보는 범위
-ORDER = ["set_site", "move", "delete_core", "delete_grid", "delete_opening", "delete_wall", "delete_beam", "delete_column", "resize", "edit_opening",
+ORDER = ["set_site", "move", "delete_core", "delete_grid", "delete_opening", "delete_wall", "delete_beam", "delete_column", "resize", "offset_column", "edit_opening",
          "add_grid", "add_column", "add_wall", "add_beam", "add_opening", "add_core", "mep_delete", "mep_relocate", "mep_route", "mep_add", "add_dims", "add_schedule"]
 
 
@@ -397,6 +397,44 @@ def do_resize(doc, ch, log):
     if not n:
         log.append(f'{ch["id"]} {ch["target"]} 단면 변경: 도면 객체 없음(새로 추가한 기둥은 추가 단계에서 최종 단면으로 그림)')
     return {"resized": n}
+
+
+def do_offset_column(doc, ch, log):
+    """기둥 하나만 옮긴다. 벽·보 선은 그리드 위에 그대로 둔다.
+    기둥을 감싼 마감 사각형은 함께 옮기고, 옛 기둥 면에서 끊겨 있던 벽선은 이어 붙인 뒤 새 자리에서 다시 끊는다.
+    옛 자리에서 끊겨 있지 않던 선(기둥 위를 지나가던 선)은 새 자리에서도 끊지 않는다."""
+    p, msp = ch["params"], doc.modelspace()
+    ents = entities_of(doc, [p["handle"]])
+    if not ents:
+        log.append(f'{ch["id"]} {ch["target"]} 기둥만 이동: 도면 객체를 찾지 못함'); return {"ok": False}
+    col = ents[0]
+    dx, dy = p["dx"], p["dy"]
+    w, hh = map(float, p["spec"].split("x"))
+    (x0, y0), (x1, y1) = p["from_xy"], p["to_xy"]
+    gx, gy = p.get("grid_xy", [x1, y1])
+    finish = tuple(l for l in WALLS if l != "COL")      # 기둥 자체(COL)는 자르지 않는다
+    moved = [col]
+    for e in list(msp):                                  # 기둥을 감싼 마감 사각형·선 (기둥 둘레 150 안에 통째로 든 것)
+        if e is col or e.dxftype() not in ("LWPOLYLINE", "LINE") or e.dxf.layer not in WALLS:
+            continue
+        ext = bb.extents([e], fast=True)
+        if ext.has_data and ext.extmin.x >= x0 - w / 2 - 150 and ext.extmax.x <= x0 + w / 2 + 150 and ext.extmin.y >= y0 - hh / 2 - 150 and ext.extmax.y <= y0 + hh / 2 + 150:
+            moved.append(e)
+    for t in msp.query("TEXT"):                          # 기둥 표기
+        if t.dxf.layer == "COL-TAG" and abs(t.dxf.insert.x - (x0 + w / 2 + 120)) < 5 and abs(t.dxf.insert.y - (y0 + hh / 2 + 120)) < 5:
+            moved.append(t)
+    for e in moved:                                      # 먼저 옮긴다 (아래의 잇기·끊기가 마감 사각형을 쪼개지 않도록)
+        e.translate(dx, dy, 0)
+    healed = cut = 0
+    for horiz, wall_c, o0, o1, size in ((False, gx, y0, y1, hh), (True, gy, x0, x1, w)):      # 세로 그리드선 위의 벽(세로로 옮길 때), 가로 그리드선 위의 벽(가로로 옮길 때)
+        if abs(o1 - o0) < 1:
+            continue
+        j = heal_range(doc, horiz, wall_c, o0 - size / 2, o0 + size / 2, layers=finish).get("joined", 0)
+        healed += j
+        if j:                                            # 옛 자리에서 끊겨 있던 선만 새 자리에서 다시 끊는다
+            _, st = cut_range(doc, horiz, wall_c, o1 - size / 2, o1 + size / 2, layers=finish); cut += st["cut_lines"]
+    log.append(f'{ch["id"]} 기둥만 이동 {ch["target"]}: ({x0:.0f}, {y0:.0f}) → ({x1:.0f}, {y1:.0f}), 감싼 마감 {len(moved) - 1}개 함께, 벽·보는 그대로, 옛 자리 벽선 {healed}쌍 이음, 새 자리 벽선 {cut}개 끊음')
+    return {"ok": True, "cut": cut, "healed": healed, "wrapped": len(moved) - 1}
 
 
 def opening_blocked(p, s, e):
@@ -896,7 +934,7 @@ def do_mep_add(doc, ch, log):
 
 
 HANDLERS = {"add_schedule": do_add_schedule, "set_site": do_set_site, "delete_core": do_delete_core, "add_core": do_add_core, "add_dims": do_add_dims, "mep_delete": do_mep_delete, "mep_relocate": do_mep_relocate, "mep_route": do_mep_route, "mep_add": do_mep_add, "move": do_move, "delete_grid": do_delete_grid, "delete_opening": do_delete_opening, "delete_wall": do_delete_wall, "delete_beam": do_delete_beam,
-            "delete_column": do_delete_column, "resize": do_resize, "edit_opening": do_edit_opening, "add_grid": do_add_grid, "add_column": do_add_column,
+            "delete_column": do_delete_column, "resize": do_resize, "offset_column": do_offset_column, "edit_opening": do_edit_opening, "add_grid": do_add_grid, "add_column": do_add_column,
             "add_wall": do_add_wall, "add_beam": do_add_beam, "add_opening": do_add_opening}
 
 
@@ -961,7 +999,7 @@ def roundtrip(dst, sheet, expected_path):
     def near(a, b, tol):
         return abs(a[0] - b[0]) <= tol and abs(a[1] - b[1]) <= tol
 
-    got_cols = [(n["xy"], n["spec"]) for n in g["nodes"] if n["type"] == "column"]
+    got_cols = [(n.get("col_xy") or n["xy"], n["spec"]) for n in g["nodes"] if n["type"] == "column"]
     for c in exp["columns"]:
         hit = next((x for x in got_cols if near(x[0], c["xy"], 10)), None)
         good = bool(hit) and hit[1] == c["spec"]

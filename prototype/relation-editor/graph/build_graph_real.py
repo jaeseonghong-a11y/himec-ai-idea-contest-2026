@@ -22,6 +22,7 @@ import ezdxf
 ROOT = Path(__file__).resolve().parents[1]
 GRID_TOL = 5
 COL_TOL = 450
+COL_OFF_TOL = 1500   # 기둥 하나만 옮긴 경우 교점에서 이만큼까지 어긋날 수 있다
 WALL_OFF = 450      # 벽 중심선이 그리드에서 벗어날 수 있는 거리
 WALL_MIN_COVER = 0.25
 HID_MIN_COVER = 0.25
@@ -438,11 +439,16 @@ def build(dxf_path: Path, sheet: str):
 
     # 기둥
     columns = {}
+    def nearest_grid(gm, v, tol):
+        c = [g for g in gm.values() if abs(g["coord"] - v) <= tol]
+        return min(c, key=lambda g: abs(g["coord"] - v))["id"] if c else None
     for c in rect_polys(msp, "COL"):
-        xi = next((g["id"] for g in gx.values() if abs(g["coord"] - c["cx"]) <= COL_TOL), None)
-        yj = next((g["id"] for g in gy.values() if abs(g["coord"] - c["cy"]) <= COL_TOL), None)
+        xi = nearest_grid(gx, c["cx"], COL_TOL) or nearest_grid(gx, c["cx"], COL_OFF_TOL)      # 교점 위가 아니면 가장 가까운 교점(기둥만 옮긴 경우)
+        yj = nearest_grid(gy, c["cy"], COL_TOL) or nearest_grid(gy, c["cy"], COL_OFF_TOL)
         if xi and yj and (xi, yj) not in columns:
+            off = [round(c["cx"] - gx[xi]["coord"]), round(c["cy"] - gy[yj]["coord"])]      # 교점에서 어긋난 거리(기둥만 옮긴 경우)
             columns[(xi, yj)] = {"id": f"C@{xi}-{yj}", "type": "column", "grid": [xi, yj], "xy": [gx[xi]["coord"], gy[yj]["coord"]],
+                                 "col_xy": [round(c["cx"]), round(c["cy"])], "offset": off if abs(off[0]) > 5 or abs(off[1]) > 5 else [0, 0],
                                  "spec": f'{int(c["w"])}x{int(c["h"])}', "handle": c["handle"], "layer": "COL"}
 
     col_faces = set()

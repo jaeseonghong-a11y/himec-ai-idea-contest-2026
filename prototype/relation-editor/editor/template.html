@@ -306,7 +306,7 @@ function autoDims(g) {
 function dimObstacles(g) {
   // 건물 안쪽 치수가 피해야 할 것들: 기둥, 벽, 보, 문·창호, 코어. 설비·전기·소방 기구는 건축 치수가 피하지 않는다(분야별 레이어라 건축도에서는 끈다)
   const out = [], N = idx(g.nodes), add = (what, box, own) => out.push({ what, box, own });
-  g.nodes.forEach(n => { if (n.type === "column") { const sp = parseSpec(n.spec); add("기둥", [n.xy[0] - sp.w / 2, n.xy[1] - sp.h / 2, n.xy[0] + sp.w / 2, n.xy[1] + sp.h / 2]); } });
+  g.nodes.forEach(n => { if (n.type === "column") { const sp = parseSpec(n.spec), c = n.cxy || n.xy; add("기둥", [c[0] - sp.w / 2, c[1] - sp.h / 2, c[0] + sp.w / 2, c[1] + sp.h / 2]); } });
   g.edges.forEach(e => { if (!e.wall) return; const a = N[e.from].xy, b = N[e.to].xy, t = (e.thick || 200) / 2 + 50;      // 보는 위에 있는 부재(은선)라 치수가 지나가도 된다
     if (e.diag) { const n = 8; for (let i = 0; i < n; i++) { const p = [a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n], q = [a[0] + (b[0] - a[0]) * (i + 1) / n, a[1] + (b[1] - a[1]) * (i + 1) / n];
       add("벽", [Math.min(p[0], q[0]) - t, Math.min(p[1], q[1]) - t, Math.max(p[0], q[0]) + t, Math.max(p[1], q[1]) + t]); } return; }
@@ -337,6 +337,9 @@ function detailDims(g) {
     g.edges.filter(e => e.wall && e.diag).forEach(e => { const a = N[e.from].xy, b = N[e.to].xy, L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; let nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L;
       const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2; if ((mx - cs[0]) * nx + (my - cs[1]) * ny < 0) { nx = -nx; ny = -ny; }      // 건물 중심에서 먼 쪽
       const t = (e.thick || 200) / 2; out.push({ id: `DA-${e.id}`, kind: "diag", orient: "A", p1: a, p2: b, n: [Math.round(nx * 1e4) / 1e4, Math.round(ny * 1e4) / 1e4], off: t + 900, ext: t + 80, value: Math.round(L) }); }); }
+  g.nodes.filter(n => n.type === "column" && (n.off[0] || n.off[1])).forEach(n => { const sp = parseSpec(n.spec);      // 교점에서 어긋난 거리
+    if (n.off[0]) out.push({ id: `DO-${n.id}-x`, kind: "offset", orient: "H", a: Math.min(n.xy[0], n.cxy[0]), b: Math.max(n.xy[0], n.cxy[0]), at: n.cxy[1] + sp.h / 2 + 500, ext: n.cxy[1] + sp.h / 2 + 80, value: Math.abs(n.off[0]) });
+    if (n.off[1]) out.push({ id: `DO-${n.id}-y`, kind: "offset", orient: "V", a: Math.min(n.xy[1], n.cxy[1]), b: Math.max(n.xy[1], n.cxy[1]), at: n.cxy[0] + sp.w / 2 + 500, ext: n.cxy[0] + sp.w / 2 + 80, value: Math.abs(n.off[1]) }); });
   const obs = dimObstacles(g), touch = ["벽", "보", "기둥"];
   const hit = (H, a, b, lo, hi, own) => obs.filter(o => { if (o.own === own) return false; const k = touch.includes(o.what) ? 250 : 0, bx = H ? [a + k, lo, b - k, hi] : [lo, a + k, hi, b - k];
     return bx[0] <= o.box[2] && bx[2] >= o.box[0] && bx[1] <= o.box[3] && bx[3] >= o.box[1]; });
@@ -489,6 +492,8 @@ function recompute(g) {
   g.nodes.forEach(n => {
     n.xy = [g.grids[n.grid[0]].coord, g.grids[n.grid[1]].coord];
     if (n.type === "column") n.spec = typeSpec(g, n.ctype);
+    if (!n.off) n.off = n.offset ? [Math.round(n.offset[0]), Math.round(n.offset[1])] : [0, 0];      // 그리드 교점에서 어긋난 거리
+    n.cxy = [n.xy[0] + n.off[0], n.xy[1] + n.off[1]];
     N[n.id] = n;
   });
   g.edges.forEach(e => {
@@ -752,6 +757,15 @@ function addColumn(g, xi, yj, ctype) {
   n.type = "column"; n.ctype = ctype || g.types[0].id;
   recompute(g); return n.id;
 }
+function offsetColumn(g, id, dx, dy, absolute) {
+  // 기둥 하나만 그리드 교점에서 (dx, dy) 어긋나게 둔다. 벽·보는 그리드 위에 그대로 있다. 절대값이면 그 값으로, 아니면 더한다
+  const n = g.nodes.find(x => x.id === id);
+  if (!n || n.type !== "column") return false;
+  const lim = 1500;      // 이보다 크면 그리드를 옮기는 것이 맞다
+  const nx = absolute ? dx : n.off[0] + dx, ny = absolute ? dy : n.off[1] + dy;
+  n.off = [Math.max(-lim, Math.min(lim, Math.round(nx / 10) * 10)), Math.max(-lim, Math.min(lim, Math.round(ny / 10) * 10))];
+  recompute(g); return true;
+}
 function deleteColumn(g, id) {
   const n = g.nodes.find(x => x.id === id);
   if (!n || n.type !== "column") return false;
@@ -808,11 +822,14 @@ function resolveInstruction(g, it) {
   if (byType.length > 1) return { ask: `${tag} 타입 기둥이 ${byType.length}개라 하나로 정할 수 없음` };
   return { ask: `"${tag}"에 해당하는 요소가 없음` };
 }
-function applyInstruction(g, it, target) {
-  // 이동 지시를 적용한다. 기둥은 그리드에 붙어 있으므로, 기둥 이동은 그 축의 그리드를 옮기는 것으로 해석한다(같은 줄의 기둥이 함께 움직임)
+function applyInstruction(g, it, target, columnOnly) {
+  // 이동 지시를 적용한다. 기본은 기둥이 놓인 줄의 그리드를 옮기는 것(같은 줄의 기둥이 함께 움직임). columnOnly 면 그 기둥 하나만 교점에서 어긋나게 둔다
   if (it.action !== "move" || !it.axis || !Number.isFinite(it.delta)) return { ok: false, note: `처리할 수 없는 변경 "${it.change}"` };
   const t = target || resolveInstruction(g, it);
   if (t.ask) return { ok: false, note: t.ask, ask: true };
+  if (columnOnly) { if (!t.node || t.node.type !== "column") return { ok: false, note: "기둥만 옮기려면 대상이 기둥이어야 함", ask: true };
+    const before = t.node.off.slice(); offsetColumn(g, t.node.id, it.axis.toUpperCase() === "X" ? it.delta : 0, it.axis.toUpperCase() === "Y" ? it.delta : 0);
+    return { ok: true, note: `기둥 ${t.node.grid.join("-")}만 이동: 교점에서 (${before.join(", ")}) → (${t.node.off.join(", ")}). 벽·보는 그대로`, node: t.node.id }; }
   const axis = it.axis.toLowerCase();
   let gid = t.grid;
   if (t.node) gid = axis === "x" ? t.node.grid[0] : t.node.grid[1];
@@ -874,11 +891,12 @@ function diff(orig, g) {
   const nowXY = n => [g.grids[n.grid[0]] ? g.grids[n.grid[0]].coord : n.xy[0], g.grids[n.grid[1]] ? g.grids[n.grid[1]].coord : n.xy[1]];
   g.nodes.forEach(n => {
     const o = ON[n.id], wasCol = o && o.type === "column", isCol = n.type === "column";
-    if (isCol && !wasCol) d.cols_added.push({ id: n.id, grid: n.grid, xy: n.xy, spec: n.spec, type: n.ctype });
+    if (isCol && !wasCol) d.cols_added.push({ id: n.id, grid: n.grid, xy: n.cxy, offset: n.off, spec: n.spec, type: n.ctype });
     else if (!isCol && wasCol) d.cols_deleted.push({ id: n.id, grid: n.grid, xy: n.xy, spec: o.spec, handle: o.handle });
     else if (o) {
       const moved = o.xy[0] !== n.xy[0] || o.xy[1] !== n.xy[1], respec = isCol && o.spec !== n.spec, retype = isCol && o.ctype !== n.ctype;
-      if (moved || respec || retype) d.nodes.push({ id: n.id, type: n.type, moved, respec, retype, from_xy: o.xy, to_xy: n.xy, from_spec: o.spec, to_spec: n.spec, from_type: o.ctype, to_type: n.ctype, handle: n.handle });
+      const oo = o.off || [0, 0], reoff = isCol && (oo[0] !== n.off[0] || oo[1] !== n.off[1]);
+      if (moved || respec || retype || reoff) d.nodes.push({ id: n.id, type: n.type, moved, respec, retype, reoff, from_xy: o.xy, to_xy: n.xy, from_off: oo, to_off: n.off, from_cxy: [o.xy[0] + oo[0], o.xy[1] + oo[1]], to_cxy: n.cxy, from_spec: o.spec, to_spec: n.spec, from_type: o.ctype, to_type: n.ctype, handle: n.handle });
     }
   });
   orig.nodes.forEach(o => { if (o.type === "column" && !GN[o.id]) d.cols_deleted.push({ id: o.id, grid: o.grid, xy: nowXY(o), spec: o.spec, handle: o.handle }); });
@@ -941,6 +959,11 @@ function rawWarnings(orig, g) {
     const pi = projectInfo(g);
     if (pi.coverage !== null && pi.coverage > 60) w.push(`개략 건폐율 ${pi.coverage}%. 60% 초과(기준은 용도지역에 따라 다름, 데모용 가정)`);
   }
+  g.nodes.filter(n => n.type === "column" && (n.off[0] || n.off[1])).forEach(n => { const sp = parseSpec(n.spec);
+    const bad = [];
+    if (Math.abs(n.off[0]) > sp.w / 2 - 50 && g.edges.some(e => (e.wall || e.beam) && e.along === n.grid[0] && (e.from === n.id || e.to === n.id))) bad.push(`${n.grid[0]} 줄의 벽·보 중심선이 기둥 밖(가로 ${Math.abs(n.off[0])} 어긋남, 단면 ${sp.w})`);
+    if (Math.abs(n.off[1]) > sp.h / 2 - 50 && g.edges.some(e => (e.wall || e.beam) && e.along === n.grid[1] && (e.from === n.id || e.to === n.id))) bad.push(`${n.grid[1]} 줄의 벽·보 중심선이 기둥 밖(세로 ${Math.abs(n.off[1])} 어긋남, 단면 ${sp.h})`);
+    if (bad.length) w.push(`기둥 ${n.grid.join("-")}: ${bad.join("; ")}. 구조 검토`); });
   { const N2 = idx(g.nodes), seen = new Set();      // 벽 두께
     g.edges.filter(e => e.wall && !e.diag).forEach(e => { [e.from, e.to].forEach(id => { const n = N2[id]; if (!n || n.type !== "column" || !n.spec) return; const sp = parseSpec(n.spec), lim = g.grids[e.along].axis === "y" ? sp.h : sp.w;
       if (e.thick > lim && !seen.has(e.id)) { seen.add(e.id); w.push(`벽 ${e.id}: 두께 ${e.thick}이 기둥 ${n.grid.join("-")}의 폭 ${lim}보다 커서 기둥 밖으로 나옴`); } });
@@ -1000,7 +1023,9 @@ function exportChanges(orig, g, reviewer) {
       donor: o.retype ? donorOf(o.to_type) : null, center_to: o.to_xy, handles: o.handles },
     `${o.id}` + (o.shift ? ` 이동 ${o.shift}` : "") + (o.retype ? ` 타입 ${o.from_type}(${o.from_w}) → ${o.to_type}(${o.to_w})` : "")));
   d.grids_added.forEach(x => add(x.id, "add_grid", { axis: x.axis, coord: x.coord, lo: x.lo, hi: x.hi }, `${x.id} 그리드 추가 ${x.axis}=${x.coord}`));
-  d.cols_added.forEach(c => add(c.id, "add_column", { grid: c.grid, xy: c.xy, spec: c.spec, type: c.type }, `기둥 추가 ${c.grid.join("-")} ${c.type} ${c.spec}`));
+  d.cols_added.forEach(c => add(c.id, "add_column", { grid: c.grid, xy: c.xy, offset: c.offset, spec: c.spec, type: c.type }, `기둥 추가 ${c.grid.join("-")} ${c.type} ${c.spec}` + (c.offset && (c.offset[0] || c.offset[1]) ? ` (교점에서 ${c.offset[0]}, ${c.offset[1]} 어긋남)` : "")));
+  d.nodes.filter(n => n.reoff && n.handle).forEach(n => add(n.id, "offset_column", { handle: n.handle, dx: n.to_off[0] - n.from_off[0], dy: n.to_off[1] - n.from_off[1], from_xy: n.from_cxy, to_xy: n.to_cxy, spec: n.to_spec, grid_xy: n.to_xy },
+    `${n.id} 기둥만 이동: 교점에서 (${n.to_off[0]}, ${n.to_off[1]}) 어긋남 (벽·보는 그대로)`));
   d.walls_added.forEach(e => add(e.id, "add_wall", { from_xy: e.from_xy, to_xy: e.to_xy, thick: e.thick, lw: e.lw }, `${e.id} 벽 추가 (두께 ${e.thick}, 선 굵기 ${(e.lw / 100).toFixed(2)})`));
   d.beams_added.forEach(e => add(e.id, "add_beam", { from_xy: e.from_xy, to_xy: e.to_xy, width: e.width || 400, kind: e.kind, span: e.span, lw: e.lw }, `${e.id} ${e.kind === "girder" ? "거더" : "보"} 추가 (경간 ${e.span}, 선 굵기 ${(e.lw / 100).toFixed(2)})`));
   d.openings_added.forEach(o => add(o.id, "add_opening", { type: o.type, otype: o.otype, leaves: o.leaves, horiz: o.horiz, center: o.center, width: o.width, thick: o.thick, wall_lw: o.wall_lw, clear: o.clear, overlaps: o.overlaps, on_edge: o.on_edge, donor: donorOf(o.otype) }, `${o.id} ${o.type === "door" ? "문" : "창호"} 추가 ${o.otype} 폭 ${o.width}`));
@@ -1126,7 +1151,7 @@ function demoScenario(g) {
   }
   return log;
 }
-if (typeof module !== "undefined") module.exports = { resolveInstruction, applyInstruction, loadInstructions, wallsOnFaces, outsideDiagonal, addDiagonal, newProjectShowcase, LW_DEFAULT, wallLw, beamLw, beamMembers, clampThick, coreWallThick, setWallThick, thickEditable, anchorOffset, siteSpan, dimObstacles, layoutDims, DIM_FIT, entryChoices, stairLead, coreEntry, coreWallFlags, coreDetail, detailDims, scheduleTables, CORE_TYPES, stairCalc, coreRect, addCore, deleteCore, setSite, addGridFree, addGridSeries, autoDims, projectInfo, polyArea, newProjectDemo, addDevice, deleteDevice, mepDiff, mepWarnings, addOpeningType, initModel, recompute, moveGridTo, addGrid, deleteGrid, intersections, candidateSegments, nodeAt, findEdge, addColumn, deleteColumn, addEdge, deleteEdgeKind, addOpening, deleteOpening, diff, warnings, exportChanges, gridLimits, demoScenario, clone, idx };
+if (typeof module !== "undefined") module.exports = { offsetColumn, resolveInstruction, applyInstruction, loadInstructions, wallsOnFaces, outsideDiagonal, addDiagonal, newProjectShowcase, LW_DEFAULT, wallLw, beamLw, beamMembers, clampThick, coreWallThick, setWallThick, thickEditable, anchorOffset, siteSpan, dimObstacles, layoutDims, DIM_FIT, entryChoices, stairLead, coreEntry, coreWallFlags, coreDetail, detailDims, scheduleTables, CORE_TYPES, stairCalc, coreRect, addCore, deleteCore, setSite, addGridFree, addGridSeries, autoDims, projectInfo, polyArea, newProjectDemo, addDevice, deleteDevice, mepDiff, mepWarnings, addOpeningType, initModel, recompute, moveGridTo, addGrid, deleteGrid, intersections, candidateSegments, nodeAt, findEdge, addColumn, deleteColumn, addEdge, deleteEdgeKind, addOpening, deleteOpening, diff, warnings, exportChanges, gridLimits, demoScenario, clone, idx };
 </script>
 
 <script id="ui">
@@ -1262,8 +1287,9 @@ if (typeof module !== "undefined") module.exports = { resolveInstruction, applyI
     });
     // 노드
     G.nodes.forEach(n => {
-      const [x, y] = n.xy, h = hot.nodes.has(n.id), f = fresh.cols.has(n.id);
+      const [x, y] = n.type === "column" ? n.cxy : n.xy, h = hot.nodes.has(n.id), f = fresh.cols.has(n.id);
       if (n.type === "column") { const p = parseSpec(n.spec), r = 300 * Math.sqrt(p.w * p.h) / 400, sl = isSel("column", n.id);
+        if (n.off[0] || n.off[1]) s += `<line x1="${n.xy[0]}" y1="${-n.xy[1]}" x2="${x}" y2="${-y}" stroke="#e65100" stroke-width="30" stroke-dasharray="90 60" pointer-events="none"/><circle cx="${n.xy[0]}" cy="${-n.xy[1]}" r="70" fill="#e65100" pointer-events="none"/>`;
         s += `<circle ${mode === "select" ? `class="clickable" data-kind="column" data-id="${esc(n.id)}"` : 'pointer-events="none"'} cx="${x}" cy="${-y}" r="${r}" fill="${f ? NEW : h ? RED : "#fff"}" stroke="${sl ? SEL : f ? NEW : h ? RED : "#000"}" stroke-width="${sl ? 90 : 60}"/>`;
         s += `<text x="${x}" y="${-y + 70}" font-size="190" text-anchor="middle" fill="${h || f ? "#fff" : "#000"}" font-weight="bold">${n.ctype}</text><text x="${x}" y="${-y + r + 260}" font-size="180" text-anchor="middle" fill="${f ? NEW : h ? RED : "#333"}">${n.spec}</text>`;
       } else s += `<circle cx="${x}" cy="${-y}" r="75" fill="${h ? RED : "#666"}" pointer-events="none"/>`;
@@ -1401,10 +1427,12 @@ if (typeof module !== "undefined") module.exports = { resolveInstruction, applyI
       p.className = ""; p.innerHTML = `<div class="row"><label>기둥</label><b>${label(n)}</b> ${o ? "" : '<span class="new">새로 추가</span>'}</div>
         <div class="row"><label>타입</label><select id="inType">${G.types.map(t => `<option value="${t.id}"${t.id === n.ctype ? " selected" : ""}>${t.id} (${t.spec})</option>`).join("")}</select></div>
         ${o ? `<div class="row"><label>원래</label>${o.ctype} (${o.spec})</div>` : ""}
-        <div class="row"><label>위치 이동</label><button id="btnGX">${n.grid[0]} 선택</button><button id="btnGY">${n.grid[1]} 선택</button></div>
-        <div class="muted">기둥은 그리드 교점에 있으므로 위치는 그리드를 옮겨 바꿉니다.</div>
+        <div class="row"><label>줄째 이동</label><button id="btnGX">${n.grid[0]} 선택</button><button id="btnGY">${n.grid[1]} 선택</button><span class="muted">그리드를 옮기면 같은 줄이 함께</span></div>
+        <div class="row"><label>기둥만 이동</label><input type="number" id="inOffX" step="10" value="${n.off[0]}" title="교점에서 가로로 어긋난 거리"><input type="number" id="inOffY" step="10" value="${n.off[1]}" title="교점에서 세로로 어긋난 거리"><button id="btnOff">적용</button></div>
+        <div class="muted">기둥만 이동은 교점에서 어긋나게 두는 것입니다(±1500까지). 벽·보는 그리드 위에 그대로 있고, 기둥 단면의 절반을 넘게 어긋나면 경고가 납니다.</div>
         <div class="row"><button id="btnDel" class="danger">기둥 삭제</button></div>`;
       $("inType").onchange = e => commit(() => { n.ctype = e.target.value; });
+      $("btnOff").onclick = () => commit(() => offsetColumn(G, n.id, Number($("inOffX").value) || 0, Number($("inOffY").value) || 0, true));
       $("btnGX").onclick = () => { sel = { kind: "grid", id: n.grid[0] }; render(); };
       $("btnGY").onclick = () => { sel = { kind: "grid", id: n.grid[1] }; render(); };
       $("btnDel").onclick = removeSelected;
@@ -1472,11 +1500,11 @@ if (typeof module !== "undefined") module.exports = { resolveInstruction, applyI
     // 경고
     const W = warnings(ORIG, G);
     $("instrPanel").innerHTML = instr.length ? `<ul class="warn" style="list-style:none;padding-left:0">${instr.map((it, i) => `<li style="margin-bottom:6px"><b>[${it.no}]</b> ${esc(it.target)} ${esc(it.change)} ${it.floor ? esc(it.floor) + " " : ""}<span class="${it.status === "confirmed" ? "new" : "hot"}">${esc(it.status_text || it.status)}</span><br>
-      ${it.applied ? `<span class="new">적용됨</span> ${esc(it.note)}` : `${esc(it.note)} ${it.action === "move" ? `<button class="instrApply" data-i="${i}" title="화면에서 그리드나 기둥을 고른 뒤 누르면 그 대상에 적용">고른 대상에 적용</button>` : ""}`}</li>`).join("")}</ul>` : `<div class="empty">불러온 지시 없음</div>`;
+      ${it.applied ? `<span class="new">적용됨</span> ${esc(it.note)}` : `${esc(it.note)} ${it.action === "move" ? `<button class="instrApply" data-i="${i}" title="화면에서 그리드나 기둥을 고른 뒤 누르면 그 줄(그리드)을 옮김">고른 줄에 적용</button><button class="instrApply" data-i="${i}" data-col="1" title="고른 기둥 하나만 교점에서 어긋나게 옮김">고른 기둥만</button>` : ""}`}</li>`).join("")}</ul>` : `<div class="empty">불러온 지시 없음</div>`;
     document.querySelectorAll(".instrApply").forEach(b => { b.onclick = () => { const it = instr[Number(b.dataset.i)];
       if (!sel || (sel.kind !== "grid" && sel.kind !== "column")) { alert("먼저 화면에서 옮길 그리드나 기둥을 클릭하세요."); return; }
       const tgt = sel.kind === "grid" ? { grid: sel.id } : { node: idx(G.nodes)[sel.id] };
-      const r = commit(() => applyInstruction(G, it, tgt)); it.applied = r.ok; it.note = r.note; if (!r.ok) alert(r.note); render(); }; });
+      const r = commit(() => applyInstruction(G, it, tgt, !!b.dataset.col)); it.applied = r.ok; it.note = r.note; if (!r.ok) alert(r.note); render(); }; });
     $("warnPanel").innerHTML = W.length ? `<ul class="warn">${W.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<div class="empty">없음</div>`;
     // 변경 내역
     const L = [], ON = idx(ORIG.nodes), lb = id => { const n = N[id] || ON[id]; return n ? label(n) : id; }, seg = e => `${lb(e.id.split("~")[0])}~${lb(e.id.split("~")[1])}`;
@@ -1739,11 +1767,19 @@ if (typeof module !== "undefined") module.exports = { resolveInstruction, applyI
         $("btnUndo").click(); ok("되돌리기", !!G.grids[last.id]); sel = null; render(); }
       { const items = [{ no: 1, target: "C1", change: "Y +300 mm", status_text: "대상 확정", status: "confirmed", action: "move", axis: "Y", delta: 300 }, { no: 2, target: "기둥", change: "Y -200 mm", floor: "3층?", status_text: "확인 필요", status: "needs_review", action: "move", axis: "Y", delta: -200 }];
         commit(() => { instr = loadInstructions(G, items); }); render();
-        ok("지시 불러오기: 목록이 패널에 뜨고, 자동으로 못 정한 것은 '고른 대상에 적용' 단추가 있음", $("instrPanel").querySelectorAll("li").length === 2 && $("instrPanel").querySelectorAll(".instrApply").length === 2);
+        ok("지시 불러오기: 목록이 패널에 뜨고, 자동으로 못 정한 것은 '고른 대상에 적용' 단추가 있음", $("instrPanel").querySelectorAll("li").length === 2 && $("instrPanel").querySelectorAll(".instrApply").length === 4);
         const gy = Object.values(G.grids).filter(x => x.axis === "y").sort((a, b) => a.coord - b.coord), g1 = gy[gy.length - 1], c0 = g1.coord;
         sel = { kind: "grid", id: g1.id }; render(); $("instrPanel").querySelector(".instrApply").click();
         ok("그리드를 고르고 '고른 대상에 적용'을 누르면 그 그리드가 +300", G.grids[g1.id].coord === c0 + 300 && instr[0].applied && $("instrPanel").textContent.includes("적용됨"), instr[0].note);
-        $("btnUndo").click(); ok("되돌리기", G.grids[g1.id].coord === c0); instr = []; sel = null; render(); }
+        $("btnUndo").click(); ok("되돌리기", G.grids[g1.id].coord === c0);
+        instr[0].applied = false; const col = G.nodes.find(n => n.type === "column" && G.edges.some(e => (e.wall || e.beam) && e.along === n.grid[1] && (e.from === n.id || e.to === n.id))) || G.nodes.find(n => n.type === "column");
+        sel = { kind: "column", id: col.id }; render(); $("instrPanel").querySelector('.instrApply[data-i="0"][data-col]').click();
+        ok("기둥을 고르고 '고른 기둥만'을 누르면 그 기둥만 교점에서 300 어긋남", col.off[1] === 300 && col.cxy[1] === col.xy[1] + 300 && instr[0].applied, instr[0].note);
+        { const ax = G.edges.some(e => (e.wall || e.beam) && e.along === col.grid[0] && (e.from === col.id || e.to === col.id)) ? 0 : 1;      // 벽·보가 있는 줄에서 어긋나게
+          sel = { kind: "column", id: col.id }; render(); $("inOffX").value = ax === 0 ? 300 : 0; $("inOffY").value = ax === 1 ? 300 : 0; $("btnOff").click();
+          ok("기둥 칸에서 어긋남을 넣으면 적용되고, 벽·보 중심선이 기둥 밖이면 경고", idx(G.nodes)[col.id].off[ax] === 300 && $("warnPanel").textContent.includes("기둥 밖"), warnings(ORIG, G).filter(w => w.includes("기둥 밖")).join(" | ").slice(0, 160));
+          $("btnUndo").click(); }
+        $("btnUndo").click(); ok("되돌리기", idx(G.nodes)[col.id].off[1] === 0); instr = []; sel = null; render(); }
       ok("변경 내보내기 내용이 만들어짐", ["set_site", "add_grid", "add_column", "add_wall", "add_beam", "add_opening", "add_core", "add_dims"].every(a => ex.some(c => c.action === a)), `(${ex.length}건)`);
     } catch (err) { out.push("FAIL  시험 중 오류: " + (err && err.stack ? err.stack.split("\n").slice(0, 3).join(" | ") : err)); }
     const pass = out.filter(x => x.startsWith("PASS")).length;

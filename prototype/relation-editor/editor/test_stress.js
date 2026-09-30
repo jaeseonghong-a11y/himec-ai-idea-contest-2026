@@ -17,7 +17,7 @@ const note = (sheet, kind, text) => { findings.push({ sheet, kind, text }); cons
 function expected(G, name) {
   const dd = C.diff(ORIG, G);
   return {
-    columns: G.nodes.filter(n => n.type === "column").map(n => ({ label: n.grid.join("-"), xy: n.xy, spec: n.spec })), columns_deleted: [],
+    columns: G.nodes.filter(n => n.type === "column").map(n => ({ label: n.grid.join("-"), xy: n.cxy || n.xy, spec: n.spec })), columns_deleted: [],
     walls_checked: dd.walls_added.map(e => ({ label: e.id, from_xy: e.from_xy, to_xy: e.to_xy, thick: e.thick, expect: true })),
     openings_checked: dd.openings_added.map(o => ({ id: o.id, type: o.type, xy: o.center, width: o.width, expect: true })), dims_checked: [],
     site: G.site, floor_height: G.project.floor_height,
@@ -160,6 +160,13 @@ function save(G, name, label) {
   const s2 = C.addCore(G, "ST4", gid9("x", 9000), gid9("y", 9500), "N", 1); G.cores.find(c => c.id === s2).travel = "UPDN";
   C.recompute(G);
   save(G, "S9", "직선 계단 둘(폭 1200 동쪽으로, 폭 1500 북쪽으로 UP+DN)");
+}
+// ---------- S10: 새 도면에서 기둥 둘을 교점에서 어긋나게 ----------
+{
+  const G = fresh(); C.newProjectDemo(G);
+  const a = G.nodes.find(n => n.grid[0] === "X2" && n.grid[1] === "Y1"), b = G.nodes.find(n => n.grid[0] === "X3" && n.grid[1] === "Y2");
+  C.offsetColumn(G, a.id, 0, 300); C.offsetColumn(G, b.id, -400, 250);
+  save(G, "S10", "X2-Y1 기둥만 위로 300(외벽을 따라), X3-Y2 기둥만 (-400, 250)");
 }
 fs.writeFileSync(path.join(outDir, "findings_js.json"), JSON.stringify(findings, null, 1));
 console.log(`\n편집기 쪽 발견 ${findings.length}건. 이어서: python tools/stress_run.py`);

@@ -202,6 +202,21 @@ G = fresh(); C.newProjectDemo(G);
   const b = C.applyInstruction(G, items[0], { grid: "X1" });
   ok("Y 이동에 세로 그리드를 찍으면 거부", !b.ok && b.ask); }
 
+// 기둥 하나만 옮기기(교점에서 어긋남)
+G = fresh(); C.newProjectDemo(G);
+{ const n = G.nodes.find(x => x.grid[0] === "X2" && x.grid[1] === "Y2"), y0 = n.xy[1];
+  ok("기둥만 300 옮기면 교점은 그대로, 기둥 중심만 어긋남", C.offsetColumn(G, n.id, 0, 300) && n.xy[1] === y0 && n.cxy[1] === y0 + 300 && G.grids.Y2.coord === y0);
+  ok("어긋난 거리 치수가 생김", G.dims2.some(d => d.kind === "offset" && d.value === 300));
+  ok("단면 절반(250)을 넘게 어긋나면 벽·보 중심선이 기둥 밖이라고 경고", C.warnings(ORIG, G).some(w => w.includes("X2-Y2") && w.includes("기둥 밖")));
+  C.offsetColumn(G, n.id, 0, 200, true);
+  ok("200이면 단면 안이라 경고 없음", !C.warnings(ORIG, G).some(w => w.includes("X2-Y2") && w.includes("기둥 밖")));
+  ok("±1500을 넘는 어긋남은 1500으로 제한", C.offsetColumn(G, n.id, 3000, 0, true) && n.off[0] === 1500);
+  C.offsetColumn(G, n.id, 0, 200, true);
+  const ex = C.exportChanges(ORIG, G, "시험"), ac = ex.find(c => c.action === "add_column" && c.target === n.id);
+  ok("내보내기: 새 기둥은 어긋난 중심 좌표와 어긋남으로", ac && ac.params.xy[1] === y0 + 200 && ac.params.offset[1] === 200);
+  const r = C.applyInstruction(G, { action: "move", axis: "Y", delta: -200, change: "Y -200 mm" }, { node: n }, true);
+  ok("지시를 '기둥만'으로 적용하면 어긋남이 바뀜", r.ok && n.off[1] === 0, r.note); }
+
 // 긴 층고: 3 m 마다 계단참
 { const k = C.stairCalc(7000, 1200);
   ok("층고 7000이면 한 번에 오르는 높이가 3 m를 넘어 중간 계단참이 생김", !!k.mid_landing && k.mid_landing.depth === 1200 && k.length === k.run + 1200 + 1200 && k.riser <= 180, JSON.stringify(k.mid_landing));
@@ -260,7 +275,7 @@ console.log("경고:", W.length, "개"); W.forEach(w => console.log("   -", w));
 fs.writeFileSync(path.join(outDir, "changes_new.json"), JSON.stringify(out, null, 1));
 const dd = C.diff(ORIG, G), lab = n => n.grid.join("-");
 const expected = {
-  columns: G.nodes.filter(n => n.type === "column").map(n => ({ label: lab(n), xy: n.xy, spec: n.spec })), columns_deleted: [],
+  columns: G.nodes.filter(n => n.type === "column").map(n => ({ label: lab(n), xy: n.cxy || n.xy, spec: n.spec })), columns_deleted: [],
   walls_checked: dd.walls_added.map(e => ({ label: e.id, from_xy: e.from_xy, to_xy: e.to_xy, thick: e.thick, expect: true })),
   openings_checked: dd.openings_added.map(o => ({ id: o.id, type: o.type, xy: o.center, width: o.width, expect: true })),
   dims_checked: [],

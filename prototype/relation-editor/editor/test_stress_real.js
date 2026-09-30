@@ -14,7 +14,7 @@ const note = (sheet, kind, text) => { findings.push({ sheet, kind, text }); cons
 function expected(G) {
   const dd = C.diff(ORIG, G);
   return {
-    columns: G.nodes.filter(n => n.type === "column").map(n => ({ label: lab(n), xy: n.xy, spec: n.spec })),
+    columns: G.nodes.filter(n => n.type === "column").map(n => ({ label: lab(n), xy: n.cxy || n.xy, spec: n.spec })),
     columns_deleted: dd.cols_deleted.map(c => ({ label: c.grid.join("-"), xy: c.xy })),
     walls_checked: [...dd.walls_added.map(e => ({ label: e.id, from_xy: e.from_xy, to_xy: e.to_xy, expect: true })), ...dd.walls_deleted.map(e => ({ label: e.id, from_xy: e.from_xy, to_xy: e.to_xy, expect: false }))],
     openings_checked: [...dd.openings_added.map(o => ({ id: o.id, type: o.type, xy: o.center, width: o.width, expect: true })),
@@ -90,6 +90,18 @@ const gridsX = G => Object.values(G.grids).filter(x => x.axis === "x").sort((a, 
   for (let i = 0; i < 40; i++) C.addDevice(G, "FS1", { x: 16000 + (i % 8) * 1200, y: 12000 + Math.floor(i / 8) * 1200 });
   const w = save(G, "R5", "문 위에 콘센트, 헤드 40개 촘촘히");
   if (!w.some(x => x.includes(id) && x.includes("겹침"))) note("R5", "누락", "문 위의 콘센트에 겹침 경고 없음");
+}
+// R6: 기둥 하나만 옮기기 (기존 도면): 외벽 위 기둥을 벽을 따라 300, 안쪽 기둥을 벽에서 200 벗어나게
+{
+  const G = fresh();
+  const cols = G.nodes.filter(n => n.type === "column");
+  const onWall = cols.find(n => G.edges.some(e => e.wall && e.along === n.grid[0] && (e.from === n.id || e.to === n.id)));      // 세로 벽 위의 기둥 → 벽을 따라(세로) 이동
+  const other = cols.find(n => n !== onWall);
+  if (onWall) C.offsetColumn(G, onWall.id, 0, 300);
+  if (other) C.offsetColumn(G, other.id, 200, 0);
+  const w = save(G, "R6", `${onWall && onWall.grid.join("-")} 기둥만 세로 300, ${other && other.grid.join("-")} 기둥만 가로 200`);
+  const ex = C.exportChanges(ORIG, G, "시험");
+  if (ex.filter(c => c.action === "offset_column").length !== 2) note("R6", "이상", "offset_column 변경이 2건이어야 함: " + ex.map(c => c.action).join(","));
 }
 fs.writeFileSync(path.join(outDir, "findings_real_js.json"), JSON.stringify(findings, null, 1));
 console.log(`\n편집기 쪽 발견 ${findings.length}건. 이어서: python tools/stress_run.py R1 R2 R3 R4 R5`);
