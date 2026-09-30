@@ -24,7 +24,7 @@ internal sealed class ReviewPanel : UserControl
     private readonly Button _analyze = new() { Text = "전사문에서 이동 지시 찾기", Width = 340 };
     private readonly Button _suggest = new() { Text = "'왼쪽 세 번째' 후보 찾기", Width = 340 };
     private readonly Button _pick = new() { Text = "도면에서 대상 직접 선택", Width = 340 };
-    private readonly Button _exportPdf = new() { Text = "수정사항 PDF로 내보내기", Width = 340 };
+    private readonly Button _exportPdf = new() { Text = "수정사항 PDF, JSON으로 내보내기", Width = 340 };
     private readonly Button _clearMarkup = new() { Text = "도면에서 주석·일람표 지우기", Width = 340 };
     private readonly CheckBox _keepMarkup = new() { Text = "표식을 도면에 남기기 (저장은 하지 않음)", Checked = true, Width = 340 };
     private readonly RecordingTagPanel _tagReview = new();
@@ -75,7 +75,7 @@ internal sealed class ReviewPanel : UserControl
         var cardTags = CreateCard("02  녹음 객체 태그", "녹음 중 직접 찍기 · 전사 후 언급 검토/수정", _tagReview);
         var cardParse = CreateCard("03  변경 지시 확인", "이동량을 읽고, 불명확한 대상은 보류합니다.", _analyze, _summary);
         var cardTarget = CreateCard("04  도면 대상 지정", "후보는 참고용 · 최종 대상은 직접 클릭", _suggest, _pick, _target);
-        var cardExport = CreateCard("05  PDF 내보내기", "일람표는 도면 우측 하단, 주석은 해당 요소 위. 표식은 도면에 남고 저장은 하지 않습니다.", _keepMarkup, _exportPdf, _clearMarkup);
+        var cardExport = CreateCard("05  PDF 내보내기", "일람표는 도면 우측 하단, 주석은 해당 요소 위. 관계도용 JSON을 PDF 옆에 함께 저장합니다.", _keepMarkup, _exportPdf, _clearMarkup);
         var cards = new[] { cardInput, cardTags, cardParse, cardTarget, cardExport };
         foreach (var card in cards) layout.Controls.Add(card);
         layout.SizeChanged += (_, _) =>
