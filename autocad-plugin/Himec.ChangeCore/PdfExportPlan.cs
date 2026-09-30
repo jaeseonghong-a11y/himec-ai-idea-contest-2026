@@ -16,6 +16,9 @@ public sealed class PdfScheduleRow
     public string Marker { get; set; } = "";
     public string Target { get; set; } = "";
     public string Floor { get; set; } = "";
+
+    /// <summary>Drawing handle of the matched object. Empty when nothing is settled.</summary>
+    public string Handle { get; set; } = "";
     public string Change { get; set; } = "";
     public string State { get; set; } = "";
     public string Note { get; set; } = "";
@@ -66,22 +69,25 @@ public static class PdfExportPlanner
             if (change.IsMatched)
             {
                 plan.MatchedCount++;
+                var handle = change.Handle ?? "";
+                var named = handle.Length > 0 ? $"{target} #{handle}" : target;
                 plan.Annotations.Add(new PdfAnnotation
                 {
                     ChangeId = change.Id,
                     Marker = marker,
-                    Handle = change.Handle ?? "",
+                    Handle = handle,
                     Drawing = change.Drawing ?? drawing ?? "",
-                    Text = $"[{marker}] {target}  {move}",
+                    Text = $"[{marker}] {named}  {move}",
                 });
                 plan.Schedule.Add(new PdfScheduleRow
                 {
                     Marker = marker,
-                    Target = target,
+                    Target = named,
+                    Handle = handle,
                     Change = move,
                     Floor = floor,
                     State = StateConfirmedTarget,
-                    Note = $"handle {change.Handle}",
+                    Note = $"handle {handle}",
                     Quote = change.SourceQuote,
                 });
                 continue;

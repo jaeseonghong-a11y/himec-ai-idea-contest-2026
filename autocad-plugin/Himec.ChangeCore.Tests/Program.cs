@@ -180,6 +180,24 @@ if (ChangeMatching.Extract("오늘 회의는 여기까지.", matchSession, "plan
 if (ChangeMatching.Describe(several[0]) != "Y +300 mm")
     throw new Exception("Move description is wrong: " + ChangeMatching.Describe(several[0]));
 
+// --- a tag survives Save As: the drawing key ignores path and CAD extensions ---
+if (ObjectMentions.DrawingKey(@"C:\work\plan.dxf") != "PLAN" ||
+    ObjectMentions.DrawingKey("plan.dxf.dwg") != "PLAN" ||
+    ObjectMentions.DrawingKey("plan.DWG") != "PLAN")
+    throw new Exception("Drawing key did not normalise");
+if (ObjectMentions.DrawingKey("plan-2.dxf") == ObjectMentions.DrawingKey("plan.dxf"))
+    throw new Exception("Different drawings must not collapse to one key");
+if (ObjectMentions.DrawingKey("report.pdf") != "REPORT.PDF")
+    throw new Exception("Only CAD extensions may be stripped");
+
+var renamed = ChangeMatching.Extract("C1을 위로 30cm 올리자.", matchSession, "plan.dxf.dwg");
+if (renamed.Count != 1 || !renamed[0].IsMatched || renamed[0].Handle != "A1")
+    throw new Exception("Tag was lost when the drawing was saved under a new name");
+var otherSheet = ChangeMatching.Extract("C1을 위로 30cm 올리자.", matchSession, "section.dxf");
+if (otherSheet[0].IsMatched || otherSheet[0].Question is null ||
+    !otherSheet[0].Question!.Contains("다른 도면"))
+    throw new Exception("A tag on another drawing should say so");
+
 // --- transcript context: the floor in force carries forward ---
 if (TranscriptContext.FloorIn("지하 2층 평면도 보자") != "지하 2층")
     throw new Exception("Basement floor was misread");
@@ -221,6 +239,12 @@ if (plan.Annotations[0].Marker != "1" || plan.Schedule[0].Marker != "1" || plan.
     throw new Exception("Markers must number the transcript order");
 if (!plan.Annotations[0].Text.Contains("C1") || !plan.Annotations[0].Text.Contains("Y +300 mm"))
     throw new Exception("Callout text lost the target or the move");
+// The handle is the only join key the relation editor can use without a human pick.
+if (!plan.Annotations[0].Text.Contains("#A1") || !plan.Schedule[0].Target.Contains("#A1") ||
+    plan.Schedule[0].Handle != "A1")
+    throw new Exception("A settled row must name the drawing handle");
+if (plan.Schedule[1].Handle.Length != 0 || plan.Schedule[1].Target.Contains("#"))
+    throw new Exception("An unsettled row must not claim a handle");
 if (plan.Schedule[1].State != PdfExportPlanner.StateQuestion || plan.Schedule[1].Note.Length == 0)
     throw new Exception("An unresolved change must carry its question into the schedule");
 if (plan.Schedule[0].State != PdfExportPlanner.StateConfirmedTarget)

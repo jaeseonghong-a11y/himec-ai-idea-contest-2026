@@ -124,11 +124,13 @@ public static class ChangeMatching
             return;
         }
 
+        var here = ObjectMentions.DrawingKey(currentDrawing);
+        bool SameLabel(RecordingTag t) =>
+            ObjectMentions.Normalize(t.Label) == ObjectMentions.Normalize(label) ||
+            ObjectMentions.Normalize(t.ExtractionKey ?? "") == ObjectMentions.Normalize(label);
+
         var matches = session.Tags.Where(t =>
-                t.IsLinked &&
-                string.Equals(t.Drawing, currentDrawing, StringComparison.OrdinalIgnoreCase) &&
-                (ObjectMentions.Normalize(t.Label) == ObjectMentions.Normalize(label) ||
-                 ObjectMentions.Normalize(t.ExtractionKey ?? "") == ObjectMentions.Normalize(label)))
+                t.IsLinked && ObjectMentions.DrawingKey(t.Drawing) == here && SameLabel(t))
             .GroupBy(t => t.Handle, StringComparer.OrdinalIgnoreCase)
             .Select(g => g.First())
             .OrderBy(t => t.Handle, StringComparer.OrdinalIgnoreCase)
@@ -146,8 +148,13 @@ public static class ChangeMatching
         item.CandidateTagIds = matches.Select(t => t.Id).ToList();
         if (matches.Length == 0)
         {
+            // Naming the other drawing turns "not found" into something the user can act on.
+            var elsewhere = session.Tags.FirstOrDefault(t => t.IsLinked && SameLabel(t));
+            var reason = elsewhere is null
+                ? $"\"{label}\"에 연결된 도면 객체가 없습니다."
+                : $"\"{label}\" 태그는 다른 도면({System.IO.Path.GetFileName(elsewhere.Drawing)})에 연결돼 있습니다.";
             Ask(item, ChangeQuestionKind.NoTagFound,
-                $"\"{label}\"에 연결된 도면 객체가 없습니다. {Describe(item)}의 대상을 도면에서 선택해 주세요.");
+                $"{reason} {Describe(item)}의 대상을 도면에서 선택해 주세요.");
             return;
         }
         Ask(item, ChangeQuestionKind.MultipleTags,

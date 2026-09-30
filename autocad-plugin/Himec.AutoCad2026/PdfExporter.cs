@@ -136,7 +136,10 @@ internal static class PdfExporter
         Point3d anchor, PdfAnnotation annotation, double textHeight)
     {
         var ids = new List<ObjectId>();
-        var tip = new Point3d(anchor.X, anchor.Y + textHeight * 3, 0);
+        // A 45-degree leader instead of a vertical one: dimension lines run horizontally
+        // and vertically above the object, and a straight-up leader lands on top of them.
+        var reach = textHeight * 2.6;
+        var tip = new Point3d(anchor.X + reach, anchor.Y + reach, 0);
         var radius = textHeight * 0.9;
         // Stop at the bubble edge rather than running through it to the centre.
         var stop = tip - (tip - anchor).GetNormal() * radius;
@@ -155,7 +158,7 @@ internal static class PdfExporter
         ids.Add(Add(tr, space, new MText
         {
             Contents = Escape(annotation.Text),
-            Location = new Point3d(tip.X + textHeight * 1.4, tip.Y, 0),
+            Location = new Point3d(tip.X + radius + textHeight * 0.5, tip.Y, 0),
             TextHeight = textHeight,
             Attachment = AttachmentPoint.MiddleLeft,
             TextStyleId = _textStyle,
@@ -225,6 +228,9 @@ internal static class PdfExporter
         var middle = bandTop - rowHeight / 2;
         for (var i = 0; i < cells.Count && i < columns.Length; i++)
         {
+            // An empty cell used to leave an invisible MText behind: it cannot be picked
+            // on screen, so it survived manual cleanup and stayed in the drawing.
+            if (string.IsNullOrWhiteSpace(cells[i])) continue;
             var next = i + 1 < columns.Length ? columns[i + 1] : width;
             ids.Add(Add(tr, space, new MText
             {

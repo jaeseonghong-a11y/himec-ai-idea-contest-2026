@@ -40,6 +40,28 @@ public static class ObjectMentions
         return ids.Length > 0 ? ids : GenericObjects(sentence);
     }
 
+    private static readonly string[] CadExtensions = [".dwg", ".dxf", ".dws", ".dwt"];
+
+    /// <summary>Identity of a drawing for tag lookup, ignoring path and CAD extensions.
+    ///
+    /// A tag points at an object, not at a file name. Saving "plan.dxf" as DWG yields
+    /// "plan.dxf.dwg", and an exact string comparison then treats the same drawing as a
+    /// different one and drops every tag on it. Stripping the extension chain keeps the
+    /// tags attached across a Save As.
+    /// </summary>
+    public static string DrawingKey(string? drawing)
+    {
+        var name = System.IO.Path.GetFileName(drawing ?? "");
+        while (true)
+        {
+            var extension = System.IO.Path.GetExtension(name);
+            if (extension.Length == 0) break;
+            if (!CadExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase)) break;
+            name = System.IO.Path.GetFileNameWithoutExtension(name);
+        }
+        return name.Trim().ToUpperInvariant();
+    }
+
     /// <summary>Compare a transcript label with a drawing identifier.</summary>
     public static string Normalize(string value) =>
         (value ?? "").Trim().Replace("-", "").ToUpperInvariant();
