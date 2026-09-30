@@ -18,6 +18,12 @@ internal static class PdfExporter
     internal const string TextStyleName = "HIMEC-TEXT";
     internal const string AnnotationLayer = "HIMEC-주석";
     internal const string ScheduleLayer = "HIMEC-일람표";
+    internal const string BorderLayer = "HIMEC-테두리";
+
+    /// <summary>A3 landscape proportion (420 x 297 mm).</summary>
+    private const double A3Ratio = 420.0 / 297.0;
+    private const double A3WidthMm = 420.0;
+    private const double BorderInsetMm = 3.0;
 
     /// <summary>Plotter configurations to try, best first.
     ///
@@ -42,13 +48,16 @@ internal static class PdfExporter
         var db = doc.Database;
         var created = new List<ObjectId>();
         using var locked = doc.LockDocument();
+        // Markup left by an earlier export would otherwise stack up: each run drew a new
+        // set over the old one, so the sheet ended up with several schedules at once.
+        EraseMarkup(doc);
         try
         {
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 _textStyle = EnsureTextStyle(tr, db);
-                EnsureLayer(tr, db, AnnotationLayer, 1);
-                EnsureLayer(tr, db, ScheduleLayer, 4);
+                EnsureLayer(tr, db, AnnotationLayer, 6);
+                EnsureLayer(tr, db, ScheduleLayer, 8);
                 var space = (BlockTableRecord)tr.GetObject(db.CurrentSpaceId, OpenMode.ForWrite);
 
                 db.UpdateExt(true);
@@ -59,17 +68,57 @@ internal static class PdfExporter
                 var span = Math.Max(Math.Max(max.X - min.X, max.Y - min.Y), 1.0);
                 var textHeight = Math.Max(span / 60.0, 1.0);
 
+                var grid = DrawingGrid.Read(tr, db);
                 foreach (var annotation in plan.Annotations)
                 {
                     var anchor = Anchor(tr, db, annotation.Handle);
                     if (anchor is null) continue;
+                    // The grid name comes from the sheet's own axis bubbles, so the schedule
+                    // and the drawing call the same intersection by the same name.
+                    var at = Position(tr, db, annotation.Handle) ?? anchor.Value;
+                    annotation.Grid = grid.IsEmpty ? "" : DrawingGrid.NameAt(grid, at);
+                    annotation.Text = PdfExportPlanner.Callout(
+                        annotation.Label, annotation.Grid, annotation.Move, annotation.Handle);
+                    foreach (var row in plan.Schedule)
+                        if (row.Handle == annotation.Handle) row.Grid = annotation.Grid;
                     created.AddRange(DrawCallout(tr, space, anchor.Value, annotation, textHeight));
                 }
                 created.AddRange(DrawSchedule(tr, space, plan, min, max, textHeight));
                 tr.Commit();
             }
 
-            PlotToPdf(doc, outputPath);
+            // The sheet box is decided after the markup exists, so the border encloses
+            // everything instead of cutting through the schedule.
+            var window = SheetBox(db);
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                EnsureLayer(tr, db, BorderLayer, 8);
+                var space = (BlockTableRecord)tr.GetObject(db.CurrentSpaceId, OpenMode.ForWrite);
+                var inset = (window.MaxPoint.X - window.MinPoint.X) * BorderInsetMm / A3WidthMm;
+                var border = new Polyline { Layer = BorderLayer, Closed = true };
+                border.AddVertexAt(0, new Point2d(window.MinPoint.X + inset, window.MinPoint.Y + inset), 0, 0, 0);
+                border.AddVertexAt(1, new Point2d(window.MaxPoint.X - inset, window.MinPoint.Y + inset), 0, 0, 0);
+                border.AddVertexAt(2, new Point2d(window.MaxPoint.X - inset, window.MaxPoint.Y - inset), 0, 0, 0);
+                border.AddVertexAt(3, new Point2d(window.MinPoint.X + inset, window.MaxPoint.Y - inset), 0, 0, 0);
+                created.Add(Add(tr, space, border));
+
+                // When the sheet was produced. Review copies get compared side by side,
+                // so the minute matters more than the seconds.
+                var stampHeight = (window.MaxPoint.Y - window.MinPoint.Y) / 75;
+                var margin = inset + stampHeight;
+                created.Add(Add(tr, space, new MText
+                {
+                    Contents = Escape("생성 " + DateTime.Now.ToString("yyyy-MM-dd HH:mm")),
+                    Location = new Point3d(window.MaxPoint.X - margin, window.MaxPoint.Y - margin, 0),
+                    TextHeight = stampHeight,
+                    Attachment = AttachmentPoint.TopRight,
+                    TextStyleId = _textStyle,
+                    Layer = BorderLayer,
+                }));
+                tr.Commit();
+            }
+
+            PlotToPdf(doc, outputPath, window);
             return outputPath;
         }
         finally
@@ -103,12 +152,46 @@ internal static class PdfExporter
         return id;
     }
 
+    /// <summary>The plotted area: everything drawn, padded, then grown to A3 proportions.
+    ///
+    /// Growing the box rather than the paper keeps the sheet the same shape whatever the
+    /// drawing's own aspect is, so two exports print at the same proportion.
+    /// </summary>
+    private static Extents3d SheetBox(Database db)
+    {
+        db.UpdateExt(true);
+        var min = db.Extmin;
+        var max = db.Extmax;
+        var width = Math.Max(max.X - min.X, 1.0);
+        var height = Math.Max(max.Y - min.Y, 1.0);
+        // Keep the border clear of the content.
+        var pad = Math.Max(width, height) * 0.03;
+        width += pad * 2;
+        height += pad * 2;
+        var cx = (min.X + max.X) / 2;
+        var cy = (min.Y + max.Y) / 2;
+        if (width / height < A3Ratio) width = height * A3Ratio;
+        else height = width / A3Ratio;
+        return new Extents3d(
+            new Point3d(cx - width / 2, cy - height / 2, 0),
+            new Point3d(cx + width / 2, cy + height / 2, 0));
+    }
+
     private static void EnsureLayer(Transaction tr, Database db, string name, short colorIndex)
     {
+        var colour = Autodesk.AutoCAD.Colors.Color.FromColorIndex(
+            Autodesk.AutoCAD.Colors.ColorMethod.ByAci, colorIndex);
         var table = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
-        if (table.Has(name)) return;
+        if (table.Has(name))
+        {
+            // Also correct an existing layer: a drawing marked up by an older build keeps
+            // the old colour otherwise, and the markup stays hard to tell from the drawing.
+            var existing = (LayerTableRecord)tr.GetObject(table[name], OpenMode.ForWrite);
+            if (existing.Color.ColorIndex != colorIndex) existing.Color = colour;
+            return;
+        }
         table.UpgradeOpen();
-        var record = new LayerTableRecord { Name = name, Color = Autodesk.AutoCAD.Colors.Color.FromColorIndex(Autodesk.AutoCAD.Colors.ColorMethod.ByAci, colorIndex) };
+        var record = new LayerTableRecord { Name = name, Color = colour };
         table.Add(record);
         tr.AddNewlyCreatedDBObject(record, true);
     }
@@ -130,6 +213,22 @@ internal static class PdfExporter
             // Entities without geometric extents cannot carry a callout.
             return null;
         }
+    }
+
+    /// <summary>Where the object sits, for deciding which grid intersection it is on.</summary>
+    private static Point3d? Position(Transaction tr, Database db, string handle)
+    {
+        if (!long.TryParse(handle, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var value)) return null;
+        if (!db.TryGetObjectId(new Handle(value), out var id) || id.IsNull || id.IsErased) return null;
+        if (tr.GetObject(id, OpenMode.ForRead) is not Entity entity) return null;
+        if (entity is BlockReference block) return block.Position;
+        try
+        {
+            var extents = entity.GeometricExtents;
+            return new Point3d((extents.MinPoint.X + extents.MaxPoint.X) / 2,
+                               (extents.MinPoint.Y + extents.MaxPoint.Y) / 2, 0);
+        }
+        catch (Autodesk.AutoCAD.Runtime.Exception) { return null; }
     }
 
     private static List<ObjectId> DrawCallout(Transaction tr, BlockTableRecord space,
@@ -173,8 +272,8 @@ internal static class PdfExporter
         var ids = new List<ObjectId>();
         var rowHeight = textHeight * 2.0;
         var left = max.X + textHeight * 8;
-        var width = textHeight * 40;
-        var columns = new[] { 0.0, textHeight * 3.5, textHeight * 11, textHeight * 21, textHeight * 27 };
+        var width = textHeight * 52;
+        var columns = new[] { 0.0, textHeight * 3.5, textHeight * 11, textHeight * 18, textHeight * 28, textHeight * 33, textHeight * 41 };
         var questions = PdfExportPlanner.Questions(plan);
 
         var titleHeight = rowHeight * 1.5;
@@ -302,15 +401,21 @@ internal static class PdfExporter
     /// <summary>Erase every entity this exporter left on its two layers.</summary>
     internal static int ClearMarkup(Document doc)
     {
+        using var locked = doc.LockDocument();
+        return EraseMarkup(doc);
+    }
+
+    /// <summary>Erase the markup. The caller already holds the document lock.</summary>
+    private static int EraseMarkup(Document doc)
+    {
         var db = doc.Database;
         var erased = 0;
-        using var locked = doc.LockDocument();
         using var tr = db.TransactionManager.StartTransaction();
         var space = (BlockTableRecord)tr.GetObject(db.CurrentSpaceId, OpenMode.ForRead);
         foreach (var id in space)
         {
             if (tr.GetObject(id, OpenMode.ForRead) is not Entity entity) continue;
-            if (entity.Layer != AnnotationLayer && entity.Layer != ScheduleLayer) continue;
+            if (!entity.Layer.StartsWith("HIMEC-", StringComparison.Ordinal)) continue;
             entity.UpgradeOpen();
             entity.Erase();
             erased++;
@@ -319,7 +424,27 @@ internal static class PdfExporter
         return erased;
     }
 
-    private static void PlotToPdf(Document doc, string outputPath)
+    /// <summary>Pick an A3 sheet if the driver offers one. The window already carries the
+    /// proportion, so falling back to the default paper only changes the printed size.</summary>
+    private static void TrySetA3(PlotSettingsValidator validator, PlotSettings settings)
+    {
+        try
+        {
+            foreach (var media in validator.GetCanonicalMediaNameList(settings))
+            {
+                var name = media?.ToString() ?? "";
+                if (name.IndexOf("A3", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                validator.SetCanonicalMediaName(settings, name);
+                return;
+            }
+        }
+        catch (Autodesk.AutoCAD.Runtime.Exception)
+        {
+            // Keep the layout's paper; the window still gives the A3 proportion.
+        }
+    }
+
+    private static void PlotToPdf(Document doc, string outputPath, Extents3d window)
     {
         var db = doc.Database;
         using var tr = db.TransactionManager.StartTransaction();
@@ -347,11 +472,18 @@ internal static class PdfExporter
             throw new InvalidOperationException("PDF 플로터를 찾지 못했습니다. DWG To PDF.pc3 설치를 확인하세요.");
         LastDeviceUsed = chosen;
         validator.RefreshLists(settings);
-        validator.SetPlotType(settings, Autodesk.AutoCAD.DatabaseServices.PlotType.Extents);
+        TrySetA3(validator, settings);
+        validator.SetPlotWindowArea(settings, new Extents2d(
+            window.MinPoint.X, window.MinPoint.Y, window.MaxPoint.X, window.MaxPoint.Y));
+        validator.SetPlotType(settings, Autodesk.AutoCAD.DatabaseServices.PlotType.Window);
         validator.SetUseStandardScale(settings, true);
         validator.SetStdScaleType(settings, StdScaleType.ScaleToFit);
         validator.SetPlotCentered(settings, true);
         validator.SetPlotPaperUnits(settings, PlotPaperUnit.Millimeters);
+
+        // A3 media is often listed portrait first; rotate rather than guess at the name.
+        var paper = settings.PlotPaperSize;
+        if (paper.Y > paper.X) validator.SetPlotRotation(settings, PlotRotation.Degrees090);
 
         var info = new PlotInfo { Layout = layout.ObjectId, OverrideSettings = settings };
         new PlotInfoValidator { MediaMatchingPolicy = MatchingPolicy.MatchEnabled }.Validate(info);

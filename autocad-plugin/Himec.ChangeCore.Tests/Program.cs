@@ -240,11 +240,20 @@ if (plan.Annotations[0].Marker != "1" || plan.Schedule[0].Marker != "1" || plan.
 if (!plan.Annotations[0].Text.Contains("C1") || !plan.Annotations[0].Text.Contains("Y +300 mm"))
     throw new Exception("Callout text lost the target or the move");
 // The handle is the only join key the relation editor can use without a human pick.
-if (!plan.Annotations[0].Text.Contains("#A1") || !plan.Schedule[0].Target.Contains("#A1") ||
-    plan.Schedule[0].Handle != "A1")
-    throw new Exception("A settled row must name the drawing handle");
-if (plan.Schedule[1].Handle.Length != 0 || plan.Schedule[1].Target.Contains("#"))
+if (plan.Schedule[0].Handle != "A1" || plan.Schedule[0].Target != "C1")
+    throw new Exception("Target stays the spoken name; the handle has its own column");
+if (plan.Schedule[1].Handle.Length != 0)
     throw new Exception("An unsettled row must not claim a handle");
+if (!PdfExportPlanner.Cells(plan.Schedule[0]).Contains("#A1"))
+    throw new Exception("The handle column must show the handle");
+
+// Callout order: name, grid, move, handle. The bubble already carries the number.
+if (PdfExportPlanner.Callout("C1", "X1-Y2", "Y +300 mm", "8E") != "C1  X1-Y2  Y +300 mm  #8E")
+    throw new Exception("Callout order is wrong");
+if (PdfExportPlanner.Callout("기둥", "", "Y -200 mm", "") != "기둥  Y -200 mm")
+    throw new Exception("Callout must drop parts it does not have");
+if (PdfExportPlanner.Headers.Count != PdfExportPlanner.Cells(plan.Schedule[0]).Count)
+    throw new Exception("Header and cell counts disagree");
 if (plan.Schedule[1].State != PdfExportPlanner.StateQuestion || plan.Schedule[1].Note.Length == 0)
     throw new Exception("An unresolved change must carry its question into the schedule");
 if (plan.Schedule[0].State != PdfExportPlanner.StateConfirmedTarget)

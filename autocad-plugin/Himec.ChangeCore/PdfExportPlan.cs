@@ -8,6 +8,11 @@ public sealed class PdfAnnotation
     public string Handle { get; set; } = "";
     public string Drawing { get; set; } = "";
     public string Text { get; set; } = "";
+
+    /// <summary>Label, grid, move, handle — filled once the drawing has been read.</summary>
+    public string Label { get; set; } = "";
+    public string Grid { get; set; } = "";
+    public string Move { get; set; } = "";
 }
 
 /// <summary>One line of the schedule printed at the right of the sheet.</summary>
@@ -19,6 +24,9 @@ public sealed class PdfScheduleRow
 
     /// <summary>Drawing handle of the matched object. Empty when nothing is settled.</summary>
     public string Handle { get; set; } = "";
+
+    /// <summary>Grid intersection such as X1-Y2, read from the sheet. Empty when unknown.</summary>
+    public string Grid { get; set; } = "";
     public string Change { get; set; } = "";
     public string State { get; set; } = "";
     public string Note { get; set; } = "";
@@ -70,19 +78,20 @@ public static class PdfExportPlanner
             {
                 plan.MatchedCount++;
                 var handle = change.Handle ?? "";
-                var named = handle.Length > 0 ? $"{target} #{handle}" : target;
                 plan.Annotations.Add(new PdfAnnotation
                 {
                     ChangeId = change.Id,
                     Marker = marker,
                     Handle = handle,
                     Drawing = change.Drawing ?? drawing ?? "",
-                    Text = $"[{marker}] {named}  {move}",
+                    Label = target,
+                    Move = move,
+                    Text = Callout(target, "", move, handle),
                 });
                 plan.Schedule.Add(new PdfScheduleRow
                 {
                     Marker = marker,
-                    Target = named,
+                    Target = target,
                     Handle = handle,
                     Change = move,
                     Floor = floor,
@@ -107,16 +116,27 @@ public static class PdfExportPlanner
         return plan;
     }
 
+    /// <summary>Callout text: name, grid, move, handle. The bubble already carries the number.</summary>
+    public static string Callout(string label, string grid, string move, string handle)
+    {
+        var parts = new List<string> { label };
+        if (!string.IsNullOrWhiteSpace(grid)) parts.Add(grid);
+        parts.Add(move);
+        if (!string.IsNullOrWhiteSpace(handle)) parts.Add("#" + handle);
+        return string.Join("  ", parts);
+    }
+
     /// <summary>Column headers for the schedule, left to right.
     ///
     /// The note is deliberately not a column: a question runs long enough to
     /// overrun a cell, so it is printed as a list under the table instead.
     /// </summary>
-    public static IReadOnlyList<string> Headers => ["번호", "대상", "변경", "층", "상태"];
+    public static IReadOnlyList<string> Headers => ["번호", "대상", "축", "변경", "층", "상태", "핸들"];
 
     /// <summary>The cells of one row, matching <see cref="Headers"/>.</summary>
     public static IReadOnlyList<string> Cells(PdfScheduleRow row) =>
-        [row.Marker, row.Target, row.Change, row.Floor, row.State];
+        [row.Marker, row.Target, row.Grid, row.Change, row.Floor, row.State,
+         row.Handle.Length > 0 ? "#" + row.Handle : ""];
 
     /// <summary>The questions printed under the table, one line each.</summary>
     public static IReadOnlyList<string> Questions(PdfExportPlan plan) =>
