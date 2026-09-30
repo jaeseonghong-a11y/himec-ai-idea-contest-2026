@@ -166,6 +166,24 @@ G = fresh(); C.newProjectDemo(G);
   ok("이웃으로 합치기: X4의 요소가 X3으로 옮겨지고 X3~X4 사이 구간은 사라짐", ok2 && !G2.grids[X4] && G2.nodes.filter(n => n.type === "column").length === 9 && G2.edges.every(e => e.from !== e.to) && G2.openings.every(o => G2.edges.some(e => e.id === o.on_edge)) && Object.values(G2.grids).filter(x => x.axis === "x").length === 3, `(기둥 ${G2.nodes.filter(n => n.type === "column").length}, 구간 ${G2.edges.length}, 문·창호 ${G2.openings.length})`);
   const ex4 = C.exportChanges(ORIG, G2, "시험"); ok("합친 뒤에도 내보내기가 됨", ex4.length > 0 && ex4.filter(c => c.action === "add_grid").length === 6); }
 
+// 건물 벽과 겹치는 코어 벽은 자동으로 끔
+G = fresh(); C.newProjectDemo(G);
+{ const gid = (ax, v) => Object.values(G.grids).find(x => x.axis === ax && x.coord === v).id;
+  const ev = G.cores.find(c => c.id === "EV-1"); ev.walls = undefined; C.recompute(G);
+  ok("승강기 왼쪽 면에 외벽이 있으면 그 면의 코어 벽은 자동으로 꺼짐(사용자 지정 없이)", ev.rect.autoOff.includes("W") && !ev.rect.flags.W && ev.rect.walls.every(w => w.side !== "W"), JSON.stringify(ev.rect.autoOff));
+  ev.walls = { W: true }; C.recompute(G);
+  ok("사용자가 켜면 다시 서고, 겹침 경고가 남", ev.rect.flags.W && C.warnings(ORIG, G).some(w => w.includes("EV-1") && w.includes("건물 벽과 겹침")));
+  ev.walls = undefined; C.recompute(G);
+  const id = C.addCore(G, "ST1", gid("x", 15000), gid("y", 3500), "N", 1), st = G.cores.find(c => c.id === id);      // 아래 외벽 위, 오른쪽 기둥 줄(X4 아님) 옆
+  ok("계단실을 외벽에 붙이면 외벽 쪽 면이 자동으로 꺼짐", st.rect.autoOff.length >= 0 && !C.warnings(ORIG, G).some(w => w.includes(id) && w.includes("건물 벽과 겹침")), JSON.stringify(st.rect.autoOff)); C.deleteCore(G, id); }
+
+// 직선 계단
+{ const k = C.stairCalc(3400, 1200, "straight"), d = C.stairCalc(3400, 1200);
+  ok("직선 계단: 한 번에 오르고 폭은 계단 폭, 길이는 꺾임 계단보다 김", k.form === "straight" && k.flights === 1 && k.risers === 19 && k.width === 1200 && k.length > d.length && k.riser <= 180, JSON.stringify([k.risers, k.run, k.length]));
+  const G3 = fresh(); C.newProjectDemo(G3); const gid3 = (ax, v) => Object.values(G3.grids).find(x => x.axis === ax && x.coord === v).id;
+  const id = C.addCore(G3, "ST3", gid3("x", 15000), gid3("y", 9500), "E", 1), c = G3.cores.find(x => x.id === id);
+  ok("직선 계단을 놓으면 화살표가 한 줄이고 가운데 나눔선이 없음", c.rect.calc.form === "straight" && c.rect.arrows.length === 1 && c.rect.arrows[0].pts.length === 2 && c.rect.x1 - c.rect.x0 === c.rect.calc.length, JSON.stringify(c.rect.arrows[0])); }
+
 // 긴 층고: 3 m 마다 계단참
 { const k = C.stairCalc(7000, 1200);
   ok("층고 7000이면 한 번에 오르는 높이가 3 m를 넘어 중간 계단참이 생김", !!k.mid_landing && k.mid_landing.depth === 1200 && k.length === k.run + 1200 + 1200 && k.riser <= 180, JSON.stringify(k.mid_landing));

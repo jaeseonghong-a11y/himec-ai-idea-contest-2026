@@ -72,7 +72,7 @@ function save(G, name, label) {
   C.recompute(G);
   const w = save(G, "S2", "3000 스팬 2x2, 모든 구간이 벽이고 문·창호가 다 있음, 코어 둘");
   if (!w.some(x => x.includes("겹침") || x.includes("닿음"))) note("S2", "누락", "코어가 문·창호와 부딪힐 텐데 경고 없음");
-  if (!w.some(x => x.includes("건물 벽과 겹침"))) note("S2", "누락", "코어 벽이 안쪽 벽 위에 겹치는데 경고 없음");
+  if (!G.cores.every(c => c.rect.autoOff.length)) note("S2", "이상", "코어가 벽 위에 놓였는데 자동으로 꺼진 면이 없음: " + JSON.stringify(G.cores.map(c => [c.id, c.rect.autoOff])));
 }
 
 // ---------- S3: 그리드 이동·삭제·추가를 사선 벽과 코어가 있는 상태에서 ----------
@@ -150,6 +150,16 @@ function save(G, name, label) {
   const w = save(G, "S8", `층고 7000 계단(길이 ${st.rect.d}), X3을 요소와 함께 삭제(12000 스팬)`);
   if (!w.some(x => x.includes("스팬") && x.includes("12000"))) note("S8", "누락", "12000 스팬 보에 경고 없음");
   if (!w.some(x => x.includes("가로지름"))) note("S8", "누락", "7720 길이 계단이 6000 스팬을 넘어 외벽을 뚫는데 경고 없음");
+}
+// ---------- S9: 직선 계단 둘(한쪽은 층고 7000의 중간 계단참) ----------
+{
+  const G = fresh(); C.newProjectDemo(G);
+  const gid9 = (ax, v) => Object.values(G.grids).find(x => x.axis === ax && x.coord === v).id;
+  G.cores = []; C.recompute(G);
+  C.addCore(G, "ST3", gid9("x", 15000), gid9("y", 9500), "E", 1);
+  const s2 = C.addCore(G, "ST4", gid9("x", 9000), gid9("y", 9500), "N", 1); G.cores.find(c => c.id === s2).travel = "UPDN";
+  C.recompute(G);
+  save(G, "S9", "직선 계단 둘(폭 1200 동쪽으로, 폭 1500 북쪽으로 UP+DN)");
 }
 fs.writeFileSync(path.join(outDir, "findings_js.json"), JSON.stringify(findings, null, 1));
 console.log(`\n편집기 쪽 발견 ${findings.length}건. 이어서: python tools/stress_run.py`);

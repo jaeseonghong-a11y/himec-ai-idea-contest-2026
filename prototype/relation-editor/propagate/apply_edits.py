@@ -545,7 +545,9 @@ def do_add_core(doc, ch, log):
                 x = (r["x0"] if sgn > 0 else r["x1"]) + sgn * off
                 msp.add_line((x, r["y0"]), (x, r["y1"]), dxfattribs=at)
             n += 1
-        if vert:   # 두 계단 사이 틈과 올라가는 방향
+        if k.get("form") == "straight":      # 직선 계단: 가운데 나눔선 없음
+            pass
+        elif vert:   # 두 계단 사이 틈과 올라가는 방향
             xm, y0 = (r["x0"] + r["x1"]) / 2, (r["y0"] if sgn > 0 else r["y1"]) + sgn * lead
             msp.add_lwpolyline([(xm - 50, y0), (xm + 50, y0), (xm + 50, y0 + sgn * run_l), (xm - 50, y0 + sgn * run_l)], close=True, dxfattribs=at)
         else:
