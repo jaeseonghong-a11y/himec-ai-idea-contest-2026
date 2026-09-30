@@ -851,13 +851,17 @@ function addDiagonal(g, a, b, kind) {
 // ----- 변경 지시(회의 녹음 → 플러그인 → PDF 표)를 관계도에 적용 -----
 function resolveInstruction(g, it) {
   // 지시의 대상(태그)을 관계도 요소로 푼다. 돌려주는 값: {grid} 또는 {node} 또는 {ask: 이유}
-  const tag = (it.target || "").trim(), m = tag.match(/^([XY]\d+[A-H]?)-([XY]\d+[A-H]?)$/i) || tag.match(/^([XY]\d+[A-H]?)$/i);
+  // "C1 #8E"처럼 플러그인이 붙인 DXF 객체 핸들이 있으면 그 핸들의 기둥을 바로 대상으로 (도면을 읽을 때 기둥마다 핸들을 남긴다)
+  const hm = (it.target || "").trim().match(/^(.*?)\s*#([0-9A-Fa-f]{1,16})$/), handle = (it.handle || (hm && hm[2]) || "").toUpperCase();
+  if (handle) { const byH = g.nodes.find(n => n.type === "column" && (n.handle || "").toUpperCase() === handle); if (byH) return { node: byH, by: "handle" }; }
+  const tag = (it.tag || (hm ? hm[1] : it.target) || "").trim(), m = tag.match(/^([XY]\d+[A-H]?)-([XY]\d+[A-H]?)$/i) || tag.match(/^([XY]\d+[A-H]?)$/i);
   if (m && !m[2] && g.grids[m[1].toUpperCase()]) return { grid: m[1].toUpperCase() };
   if (m && m[2]) { const n = g.nodes.find(n => (n.grid[0] === m[1].toUpperCase() && n.grid[1] === m[2].toUpperCase()) || (n.grid[1] === m[1].toUpperCase() && n.grid[0] === m[2].toUpperCase())); if (n) return { node: n }; }
   const byType = g.nodes.filter(n => n.type === "column" && n.ctype === tag);
   if (byType.length === 1) return { node: byType[0] };
-  if (byType.length > 1) return { ask: `${tag} 타입 기둥이 ${byType.length}개라 하나로 정할 수 없음` };
-  return { ask: `"${tag}"에 해당하는 요소가 없음` };
+  const hnote = handle ? ` (핸들 #${handle}은 이 도면에 없음)` : "";
+  if (byType.length > 1) return { ask: `${tag} 타입 기둥이 ${byType.length}개라 하나로 정할 수 없음${hnote}` };
+  return { ask: `"${tag}"에 해당하는 요소가 없음${hnote}` };
 }
 function applyInstruction(g, it, target, columnOnly) {
   // 이동 지시를 적용한다. 기본은 기둥이 놓인 줄의 그리드를 옮기는 것(같은 줄의 기둥이 함께 움직임). columnOnly 면 그 기둥 하나만 교점에서 어긋나게 둔다
